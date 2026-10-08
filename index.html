@@ -83,7 +83,7 @@ input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabul
 .pw.solo .pnh{margin-left:0}
 .ins-b{box-shadow:0 -3px 0 var(--accent)}
 .ins-a{box-shadow:0 3px 0 var(--accent)}
-.pn{flex:1 1 100%;display:grid;grid-template-columns:14px minmax(40px,70px) minmax(54px,76px) auto 26px;gap:7px;align-items:end;justify-content:start}
+.pn{flex:1 1 100%;display:grid;grid-template-columns:14px minmax(40px,70px) minmax(54px,76px) minmax(54px,76px) 26px;gap:7px;align-items:end;justify-content:start}
 .pn.solo{grid-template-columns:minmax(40px,74px) minmax(54px,80px) auto}
 .rg{display:flex;gap:6px;align-items:end;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:3px 6px 5px;margin-bottom:-6px}
 .rg .f:first-child{width:50px}
@@ -98,7 +98,7 @@ input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabul
 .tl.ind,.tla.ind{margin-left:22px}
 .tla{flex:1 1 100%;font-size:13px;margin-top:-2px}
 .mir{flex:1 1 100%;margin:0}
-@media (max-width:480px){.pn{grid-template-columns:14px repeat(2,minmax(0,1fr)) 26px}.pn.solo{grid-template-columns:repeat(2,minmax(0,1fr))}.rg{grid-column:1/-1;justify-self:start;margin-bottom:0}.pn .btn.x{grid-row:1;grid-column:4}}
+@media (max-width:480px){.pn{grid-template-columns:14px repeat(3,minmax(0,1fr)) 26px}.pn.solo{grid-template-columns:repeat(2,minmax(0,1fr))}.rg{grid-column:1/-1;justify-self:start;margin-bottom:0}.pn .btn.x{grid-row:1;grid-column:5}}
 .pn input[type=number]{width:100%}
 .pn input:not([type=checkbox]){padding-inline:6px}
 .pn .f span{white-space:nowrap;font-size:10.5px;letter-spacing:.02em}
@@ -114,6 +114,11 @@ input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabul
 .insx .chk{flex:0 0 auto}
 .insx .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .chk.warnline{color:var(--warn);font-weight:500}
+.rtb .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.rtb{display:flex;flex-direction:column;gap:8px;align-items:stretch}
+.rtr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;padding:8px 10px;border:1px solid var(--line);border-radius:4px}
+.rtn{font-weight:600;flex:1 1 180px}
+.rtc{color:var(--muted);font-variant-numeric:tabular-nums;min-width:70px}
 .btn.addx{background:var(--warn-bg);color:var(--warn);border-color:var(--warn);font-weight:600}
 .btn.addx:hover{filter:brightness(.96)}
 .nothing{margin:0;padding:10px 12px;border:1px dashed var(--line);border-radius:5px;font-size:14px}
@@ -233,7 +238,7 @@ td .u{color:var(--warn)}
 const ROOM_TYPES=['Live room','Booth','Iso room','Machine room'];
 const STEPS=['Rooms','House rules','Preamps','Converters','Outboard','Monitoring'];
 
-const S={step:0,sel:0,norm:{},pn:{},lab:{},
+const S={step:0,sel:0,norm:{},pn:{},lab:{},retv:2,
  rooms:[{id:'r1',name:'Live Room',panels:[{label:'',lines:0,cue:0}]}],
  pre:[],
  ob:[],
@@ -259,9 +264,9 @@ function build(){
  const P=(l,dev,conn,io,bal=true)=>({l,dev,conn,io,bal});
  const G=(arr,gt,gs,plf)=>{let n=0;arr.forEach(x=>{if(x){x.gt=gt;x.gs=gs;x.pl=String(plf(n++))}});return arr},LRn=(st,i)=>st?(Math.floor(i/2)+1)+'LR'[i%2]:i+1,chS=(n,i)=>n===2?'LR'[i]:String(i+1);
  const K=(cl,cn,arr,nn)=>{let n=0;arr.forEach(x=>{if(x){x.cl=cl;x.cn=cn;x.pid=cl+'#'+(n++);if(nn)x.nn=true}});return arr};
- const PX=[];S.rooms.forEach(r=>r.panels.forEach(pn=>{const g=PX.length,lb=(pn.label||'').trim()||letter(g);const pv=PX[g-1],on=!!(pn.cont&&pv);PX.push({r,pn,g,lb,dev:r.name+' panel '+lb,mo:on?pv.mo+(+pv.pn.lines||0):0,ro:on?pv.ro+(+pv.pn.cue||0):0})}));
+ const PX=[];S.rooms.forEach(r=>r.panels.forEach(pn=>{const g=PX.length,lb=(pn.label||'').trim()||letter(g);const pv=PX[g-1],on=!!(pn.cont&&pv);PX.push({r,pn,g,lb,dev:r.name+' panel '+lb,mo:on?pv.mo+(+pv.pn.lines||0):0,ro:on?pv.ro+(pv.pn.stereo?Math.ceil((+pv.pn.cue||0)/2):(+pv.pn.cue||0)):0})}));
  const micLines=PX.flatMap(x=>K('mic:'+x.g,x.r.name+' '+x.lb+' mic lines',G(range(x.pn.lines).map(i=>P(x.lb+' '+(x.mo+i+1),x.dev,'XLR-F','out')),x.r.name+' '+x.lb,x.lb,i=>x.mo+i+1)));
- const mkCue=x=>K('ret:'+x.g,x.r.name+' '+x.lb+' returns',G(range(x.pn.cue*(x.pn.stereo?2:1)).map(i=>P(x.lb+' RET '+(x.pn.stereo?(x.ro+Math.floor(i/2)+1)+'LR'[i%2]:x.ro+i+1),x.dev,'XLR-M','in')),x.r.name+' '+x.lb+' returns',x.lb+' RET',i=>x.pn.stereo?(x.ro+Math.floor(i/2)+1)+'LR'[i%2]:x.ro+i+1));
+ const mkCue=x=>K('ret:'+x.g,x.r.name+' '+x.lb+' returns',G(range(+x.pn.cue||0).map(i=>P(x.lb+' RET '+(x.pn.stereo?(x.ro+Math.floor(i/2)+1)+'LR'[i%2]:x.ro+i+1),x.dev,'XLR-M','in')),x.r.name+' '+x.lb+' returns',x.lb+' RET',i=>x.pn.stereo?(x.ro+Math.floor(i/2)+1)+'LR'[i%2]:x.ro+i+1));
  const cueDirect=PX.filter(x=>x.pn.direct).flatMap(mkCue),cueLines=PX.filter(x=>!x.pn.direct).flatMap(mkCue);
  const preIn=S.pre.flatMap((u,ui)=>K('prei:'+ui,devName(u)+' inputs',G(range(u.ch).map(i=>P(lab(u)+(u.ch>1?' '+(i+1):''),devName(u),'XLR-M','in')),devName(u)+' in',lab(u),i=>i+1)));
  const mxO=(u,n,tag)=>u.mixer?range(n||0).map(i=>P(lab(u)+' '+tag+(i+1),devName(u),'Line','out')):[];
@@ -364,6 +369,7 @@ function build(){
  if(obOuts+obIns)C('info',`Outboard is not normalled: ${obOuts} outs and ${obIns} ins sit on the bay for patching.`);
  if(tieTop.length)C('info',`${tieTop.length} tie lines sit in their own section with no normal, apart from preamps and converters.`);
  TIES.filter(t=>!t.bay).forEach(t=>C('info',`${t.from} to ${t.to}: ${t.n} tie ${t.n>1?'lines run':'line runs'} room to room (${t.lb}) and ${t.n>1?'are':'is'} not on the patchbay.`));
+ PX.forEach(x=>{const n=+x.pn.cue||0;if(x.pn.stereo&&n%2)C('warn',`${x.r.name} XLR panel ${x.lb} has ${n} returns set as stereo pairs, so the last one has no partner.`)});
  if(MM){const left=mmPend.length;
   C('info',`Cue mixer: its ${MM.outs} ${MM.outSt?'stereo ':''}outputs (${mmOut.length} channels) sit above the room returns${cueLines.length?'':' (no room returns are set yet)'}, and its ${MM.ins} ${MM.inSt?'stereo ':''}inputs (${mmIn.length} channels) come from ${MM.src==='da'?(mixIn.length?span(cueSrc[0],cueSrc[mixIn.length-1]):'the converter outputs'):'the mixer aux sends'}.`);
   if(MM.src==='sends'&&left)C('warn',`${left} cue mixer ${left>1?'inputs have':'input has'} no free aux send to sit under. Tick a mixer in Preamps or raise its aux sends.`);
@@ -407,6 +413,10 @@ function gearStep(g,q,hint){
  (items.length?'':`<p class="hint">None added yet.</p>`)+`</div><div><button class="btn" data-c="addgear" data-g="${g}">Add unit</button></div>
  <p class="total" id="total-${g}">${totalHTML(g)}</p>`;
 }
+function retBlock(){let g=0;const rows=[];
+ S.rooms.forEach((r,i)=>r.panels.forEach((pn,j)=>{const lb=(pn.label||'').trim()||letter(g++),n=+pn.cue||0;if(!n)return;const id=`rt-${i}-${j}`,at=`data-a="panel" data-i="${i}" data-j="${j}"`;
+  rows.push(`<div class="rtr"><span class="rtn">${esc(r.name||'Room')} · XLR panel ${esc(lb)}</span><span class="rtc">${n} ${n>1?'returns':'return'}</span><label class="chk"><input type="checkbox" id="${id}-stereo"${pn.stereo?' checked':''} ${at} data-p="stereo"><span>Stereo pairs</span></label><label class="chk"><input type="checkbox" id="${id}-direct"${pn.direct?' checked':''} ${at} data-p="direct"><span>Direct from converter</span></label></div>`)}));
+ return `<div class="row rtb"><span class="cap">Room returns</span>${rows.length?rows.join(''):'<p class="hint">No XLR panel has returns yet. Add them under Rooms.</p>'}</div>`}
 function stepHTML(){
  const s=[0,5,1,3,2,4][S.step];
  if(s===0)return `<p class="q">Rooms and their XLR panels</p>
@@ -415,9 +425,7 @@ function stepHTML(){
  ${r.panels.map((pn,j)=>{const id=`pn-${i}-${j}`,at=`data-a="panel" data-i="${i}" data-j="${j}"`;return `<div class="pw" data-row="pn:${i}"><div class="pnh" id="${id}-h">XLR panel ${esc((pn.label||'').trim()||letter(gidx(i,j)))}</div><div class="pn"><span class="grip" data-list="pn:${i}" data-i="${j}" data-tip="Drag to reorder"></span>
   <label class="f" data-tip="XLR Panel Name"><span>Label</span><input id="${id}-label" maxlength="6" value="${esc(pn.label||'')}" placeholder="${letter(gidx(i,j))}" ${at} data-p="label"></label>
   <label class="f"><span>Mic lines</span><input type="number" min="0" max="96" id="${id}-lines" value="${pn.lines}" ${at} data-p="lines"></label>
-  <div class="rg${pn.cue?'':' off'}" id="${id}-rg" role="group" aria-label="Returns"><label class="f"><span>Returns</span><input type="number" min="0" max="24" id="${id}-cue" value="${pn.cue}" ${at} data-p="cue"></label>
-  <label class="f ck" data-tip="Returns are stereo pairs"><span>Stereo</span><input type="checkbox" id="${id}-stereo"${pn.stereo?' checked':''}${pn.cue?'':' disabled'} ${at} data-p="stereo"></label>
-  <label class="f ck" data-tip="Returns direct from converter output"><span>Direct</span><input type="checkbox" id="${id}-direct"${pn.direct?' checked':''}${pn.cue?'':' disabled'} ${at} data-p="direct"></label></div>
+  <label class="f"><span>Returns</span><input type="number" min="0" max="48" id="${id}-cue" value="${pn.cue}" ${at} data-p="cue"></label>
   ${r.panels.length>1?`<button class="btn x" type="button" data-c="rmpanel" data-i="${i}" data-j="${j}" aria-label="Remove panel ${letter(gidx(i,j))}">×</button>`:''}
   ${gidx(i,j)>0?`<label class="chk pcont"><input type="checkbox" id="${id}-cont"${pn.cont?' checked':''} ${at} data-p="cont"><span>Continue numbering from the panel above</span></label>`:''}</div></div>`}).join('')}
  <div><button class="btn addx" type="button" data-c="addpanel" data-i="${i}">Add XLR panel</button></div></div></div>`).join('')+`</div>`;
@@ -431,7 +439,7 @@ function stepHTML(){
  <div class="row"><label class="chk"><input type="checkbox" id="mm-on"${S.mm.on?' checked':''} data-a="mm" data-p="on"><span>Cue mixer</span></label>
  ${S.mm.on?`<div class="line mmx"><div class="rg"><label class="f"><span>Inputs</span><input type="number" min="0" max="48" id="mm-ins" value="${S.mm.ins}" data-a="mm" data-p="ins"></label><label class="f ck"><span>Stereo</span><input type="checkbox" id="mm-inSt"${S.mm.inSt?' checked':''} data-a="mm" data-p="inSt"></label></div>
  <div class="rg"><label class="f"><span>Outputs</span><input type="number" min="0" max="48" id="mm-outs" value="${S.mm.outs}" data-a="mm" data-p="outs"></label><label class="f ck"><span>Stereo</span><input type="checkbox" id="mm-outSt"${S.mm.outSt?' checked':''} data-a="mm" data-p="outSt"></label></div></div>
- <label class="f grow"><span>Input comes from</span><select id="mm-src" data-a="mm" data-p="src"><option value="da"${S.mm.src==='da'?' selected':''}>Converter outputs</option><option value="sends"${S.mm.src==='sends'?' selected':''}>Aux sends from mixer</option></select></label>`:''}</div>`;
+ <label class="f grow"><span>Input comes from</span><select id="mm-src" data-a="mm" data-p="src"><option value="da"${S.mm.src==='da'?' selected':''}>Converter outputs</option><option value="sends"${S.mm.src==='sends'?' selected':''}>Aux sends from mixer</option></select></label>`:''}</div>`+retBlock();
  return `<p class="q">What are the house rules?</p><p class="hint">Choose the bay format and how much room to leave.</p>
  <div class="row"><label class="f grow"><span>Patchbay format</span><select id="set-fmt" data-a="set" data-p="fmt"><option value="bantam"${S.fmt==='bantam'?' selected':''}>Bantam (TT) · 2 × 48 points</option><option value="jack"${S.fmt==='jack'?' selected':''}>Jack · 2 × 24 points</option></select></label></div>
  <div class="row"> <label class="f grow"><span>Spare capacity</span><select id="set-spare" data-a="set" data-p="spare">${[0,10,20,30,50].map(v=>`<option value="${v}"${v===S.spare?' selected':''}>${v} %</option>`).join('')}</select></label></div>
@@ -455,7 +463,7 @@ function hist(from,to){if(!from.length)return false;to.push(snap());const o=JSON
 function renderPanels(p){
  const box=document.getElementById('panels'),by={};p.cols.forEach(c=>['t','m'].forEach(r=>{const x=c[r];if(x&&/^(mic|ret):/.test(x.cl||''))by[x.pid]=x}));
  const W=482.6,U=44.45,P=26,X0=(W-15*P)/2,R=10.6,f=n=>(+n).toFixed(2);let g=0,h='',pv=null;
- S.rooms.forEach(r=>r.panels.forEach(pn=>{const gi=g++,lb=(pn.label||'').trim()||letter(gi),nm=+pn.lines||0,nr=(+pn.cue||0)*(pn.stereo?2:1),on=!!(pn.cont&&pv),mo=on?pv.mo+pv.nm:0,ro=on?pv.ro+pv.nc:0;pv={mo,ro,nm,nc:+pn.cue||0};if(!nm&&!nr)return;
+ S.rooms.forEach(r=>r.panels.forEach(pn=>{const gi=g++,lb=(pn.label||'').trim()||letter(gi),nm=+pn.lines||0,nr=+pn.cue||0,on=!!(pn.cont&&pv),mo=on?pv.mo+pv.nm:0,ro=on?pv.ro+pv.nc:0;pv={mo,ro,nm,nc:pn.stereo?Math.ceil(nr/2):nr};if(!nm&&!nr)return;
   const mk=(kind,n,gs0,plf,k,col)=>range(n).map(i=>{const x=by[kind+':'+gi+'#'+i];return {gs:x?x.gs:gs0,pl:x?x.pl:String(plf(i)),k,col}});
   const rows=[];const add=items=>{for(let i=0;i<items.length;i+=16)rows.push({it:items.slice(i,i+16)})};
   add(mk('mic',nm,lb,i=>mo+i+1,'f',1));{const rt=mk('ret',nr,lb+' RET',i=>pn.stereo?(ro+Math.floor(i/2)+1)+'LR'[i%2]:ro+i+1,'m',6),last=rows[rows.length-1];
@@ -515,8 +523,7 @@ function onField(e){
  const el=e.target,a=el.dataset.a;if(!a)return;let rer=false;
  if(a==='room'){const r=S.rooms[+el.dataset.i];r.name=el.value;form.querySelectorAll('select[data-a="tie"] option').forEach(o=>{if(o.value===r.id)o.textContent=r.name||'Room'});mirrors()}
  else if(a==='tie'){const t=S.rooms[+el.dataset.i].panels[+el.dataset.j].ties[+el.dataset.k],p=el.dataset.p;t[p]=p==='n'?clamp(el.value,0,96):el.value;mirrors()}
- else if(a==='panel'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j],p=el.dataset.p;pn[p]=(p==='direct'||p==='stereo'||p==='cont')?el.checked:(p==='lines'||p==='cue'||p==='tie')?clamp(el.value,0,96):el.value;if(p==='label'){const h=document.getElementById('pn-'+el.dataset.i+'-'+el.dataset.j+'-h');if(h)h.textContent='XLR panel '+((pn.label||'').trim()||letter(gidx(+el.dataset.i,+el.dataset.j)))}
- if(p==='cue'){const id='pn-'+el.dataset.i+'-'+el.dataset.j;document.getElementById(id+'-rg').classList.toggle('off',!pn.cue);['stereo','direct'].forEach(k=>{document.getElementById(id+'-'+k).disabled=!pn.cue})}}
+ else if(a==='panel'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j],p=el.dataset.p;pn[p]=(p==='direct'||p==='stereo'||p==='cont')?el.checked:(p==='lines'||p==='cue')?clamp(el.value,0,p==='cue'?48:96):el.value;if(p==='label'){const h=document.getElementById('pn-'+el.dataset.i+'-'+el.dataset.j+'-h');if(h)h.textContent='XLR panel '+((pn.label||'').trim()||letter(gidx(+el.dataset.i,+el.dataset.j)))}}
  else if(a==='gear'){const it=S[el.dataset.g][+el.dataset.i],p=el.dataset.p;if(p==='insCh'||p==='insGrp'||p==='insOut'){it[p]=el.checked}else if(p==='cont'){it.cont=el.checked;convNotes()}else if(p==='mixer'){it.mixer=el.checked;if(it.mixer&&it.sends==null){it.sends=4;it.groups=4;it.outs=2}rer=true}else if(p==='row'){it.row=el.value}else if(p==='name'||p==='label'){it[p]=el.value;if(el.dataset.g==='conv')convNotes();if(p==='name'&&el.dataset.g!=='conv'){const l=document.getElementById(el.dataset.g+'-'+el.dataset.i+'-label');if(l)l.placeholder=autoLabel(it.name)}}else{it[p]=clamp(el.value,p==='ch'?1:0,128);const g=el.dataset.g,t=document.getElementById('total-'+g);if(t)t.innerHTML=totalHTML(g);}}
  else if(a==='mm'){const p=el.dataset.p;if(p==='on'){S.mm.on=el.checked;rer=true}else if(p==='inSt'||p==='outSt')S.mm[p]=el.checked;else if(p==='src')S.mm.src=el.value;else S.mm[p]=clamp(el.value,0,48)}
  else if(a==='set'){const p=el.dataset.p;if(p==='console'||p==='fmt'){S[p]=el.value;rer=true;if(p==='fmt'){S.moves={};histClear()}}else if(p==='monBay'||p==='monOff')S[p]=el.checked;else S[p]=clamp(el.value,0,128)}
@@ -599,12 +606,13 @@ document.addEventListener('click',e=>{
 const DEF=JSON.parse(JSON.stringify(S)),KEY='studio-patch-planner-project';
 function applyState(o){
  if(!o||!['rooms','pre','ob','conv'].every(k=>Array.isArray(o[k])))throw new Error('not a project');
- const n=Object.assign(JSON.parse(JSON.stringify(DEF)),JSON.parse(JSON.stringify(o)));
+ const oldRet=!(o.retv>=2),n=Object.assign(JSON.parse(JSON.stringify(DEF)),JSON.parse(JSON.stringify(o)));
  const oldTies=Array.isArray(n.tie)?n.tie:[];n.tie=[];
  n.rooms=n.rooms.map(r=>Array.isArray(r.panels)&&r.panels.length?r:{name:r.name||'Room',panels:[{label:r.label||'',lines:+r.lines||0,cue:+r.cue||0,direct:!!r.direct,stereo:!!r.stereo}]});
  oldTies.forEach(u=>{if(u&&u.n)n.rooms.push({name:u.name||'Tie lines',panels:[{label:'',lines:0,cue:0,tie:+u.n||0}]})});
  n.rooms.forEach(r=>{if(!r.id)r.id=uid('r');r.panels.forEach(pn=>{if(pn.tie==null)pn.tie=Array.isArray(pn.ties)?pn.ties.reduce((a,t)=>a+(+(t&&t.n)||0),0):0;pn.tie=+pn.tie||0;delete pn.ties})});
  {let g=0;n.rooms.forEach(r=>r.panels.forEach(pn=>{const lb=(pn.label||'').trim()||letter(g);g++;if(pn.tie>0){n.ob.push({name:'Tie lines '+lb,label:lb+' TIE',i:0,o:pn.tie});['moves','lab'].forEach(m=>Object.keys(n[m]||{}).forEach(k=>{if(/^tie:/.test(k))delete n[m][k]}))}pn.tie=0}))}
+ if(oldRet)n.rooms.forEach(r=>r.panels.forEach(pn=>{if(pn.stereo)pn.cue=(+pn.cue||0)*2}));n.retv=2;
  if(n.convSum){n.conv.forEach((u,k)=>{if(k>0)u.cont=true});n.convSum=false}
  if(!n.mm||typeof n.mm!=='object')n.mm={on:false,ins:4,inSt:false,outs:2,outSt:true,src:'da'};
  n.step=Math.min(STEPS.length-1,Math.max(0,parseInt(n.step,10)||0));n.sel=0;
