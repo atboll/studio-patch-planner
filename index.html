@@ -1,0 +1,781 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Studio Patch Planner</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: interview on the left, the generated plan (checks, bay faces) on the right; stacks on narrow screens. */
+:root{
+  --bg:#e9edef; --panel:#f8fafa; --ink:#15212a; --muted:#56666f; --line:#c9d2d7; --accent:#0d6c79; --accent-ink:#ffffff;
+  --warn:#a85a00; --warn-bg:#fbeeda; --ok:#1f7a4d; --info:#3a5f8a;
+  --bay:#1c2327; --bay-ink:#c8d2d6; --bay-line:#39454c; --bay-accent:#55c3cf; --strip:#f1f3ee; --strip-ink:#141a1d; --jack:#0a0d0f;
+  --c1:#c2571a; --c2:#0d7f8c; --c3:#7a58c9; --c4:#2f7fd0; --c5:#b0428a; --c6:#4d8a2a; --c7:#8a7a12; --c8:#6b7780;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#10161a; --panel:#182026; --ink:#e2e9ec; --muted:#94a3ab; --line:#2b373f; --accent:#55c3cf; --accent-ink:#06181b;
+  --warn:#f0b057; --warn-bg:#33270f; --ok:#63c794; --info:#8fb5e3;
+  --bay:#0a0e10; --bay-ink:#b9c4c9; --bay-line:#2a353b; --bay-accent:#55c3cf; --strip:#dfe3dc; --strip-ink:#10161a; --jack:#000000;
+  --c1:#e8834a; --c2:#3fb6c2; --c3:#a48bea; --c4:#62a6ea; --c5:#d977b6; --c6:#82bd5c; --c7:#c9b540; --c8:#8b98a0;
+  color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#10161a; --panel:#182026; --ink:#e2e9ec; --muted:#94a3ab; --line:#2b373f; --accent:#55c3cf; --accent-ink:#06181b;
+  --warn:#f0b057; --warn-bg:#33270f; --ok:#63c794; --info:#8fb5e3;
+  --bay:#0a0e10; --bay-ink:#b9c4c9; --bay-line:#2a353b; --bay-accent:#55c3cf; --strip:#dfe3dc; --strip-ink:#10161a; --jack:#000000;
+  --c1:#e8834a; --c2:#3fb6c2; --c3:#a48bea; --c4:#62a6ea; --c5:#d977b6; --c6:#82bd5c; --c7:#c9b540; --c8:#8b98a0;
+  color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+.wrap{max-width:1500px;margin:0 auto;padding-inline:20px;padding-block:24px 56px;display:flex;flex-direction:column;gap:22px}
+header h1{font-family:var(--display);font-weight:700;font-size:34px;line-height:1;letter-spacing:.01em;margin:0;text-transform:uppercase}
+header p{margin:6px 0 0;color:var(--muted);max-width:65ch}
+.cols{display:grid;grid-template-columns:minmax(0,460px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:1120px){.cols{grid-template-columns:minmax(0,1fr)}}
+.col{display:flex;flex-direction:column;gap:18px;min-width:0}
+@media (min-width:1121px){.col.ask{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);max-height:calc(100vh - 24px);overflow-y:auto}}
+h2{font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);margin:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+
+/* interview */
+.steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+.steps button{font:500 12.5px var(--body);color:var(--muted);background:transparent;border:1px solid var(--line);border-radius:3px;padding:4px 8px;cursor:pointer}
+.steps button b{font-family:var(--mono);font-weight:500;margin-right:5px}
+.steps button[aria-current="step"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.q{font-family:var(--display);font-weight:600;font-size:26px;line-height:1.1;margin:0;text-wrap:balance}
+.hint{color:var(--muted);font-size:13.5px;margin:0}
+.rows{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:end;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0;padding-bottom:0}
+.f{display:flex;flex-direction:column;gap:3px;min-width:0}
+.f.grow{flex:1 1 150px}
+.f span{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+input,select{font:400 14.5px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:6px 8px;min-width:0;width:100%}
+input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+.btn{font:500 14px var(--body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:7px 12px;cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.x{padding:6px 10px;color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:default}
+.nav{display:flex;justify-content:space-between;gap:8px}
+.count{display:flex;align-items:center;gap:10px}
+.count output{font:500 22px var(--mono);min-width:2ch;text-align:center}
+.f.lbl input{width:96px}
+.line{flex:1 1 100%;display:flex;gap:8px;align-items:end}
+.line .btn{margin-left:auto}
+.line.rmrow .btn{margin-left:0}
+.row.u{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start}
+.rb{display:flex;flex-wrap:wrap;gap:8px;align-items:end;min-width:0}
+.tools{display:flex;flex-direction:column;align-items:center;padding-top:25px}
+.grip{display:block;width:14px;height:21px;background:radial-gradient(circle,var(--muted) 1.2px,transparent 1.6px) 0 0/7px 7px;cursor:grab;touch-action:none}
+.pn .grip{margin-bottom:6px}
+.mv{all:unset;box-sizing:border-box;width:22px;height:18px;line-height:16px;text-align:center;font-size:8px;color:var(--muted);border:1px solid var(--line);border-radius:3px;cursor:pointer}
+.mv:disabled{opacity:.3;cursor:default}
+.mv:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row.lift,.pw.lift{opacity:.35}
+.pw{flex:1 1 100%;margin-top:4px}
+.pnh{font:600 11px var(--display);letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:0 0 3px 21px}
+.pw.solo .pnh{margin-left:0}
+.ins-b{box-shadow:0 -3px 0 var(--accent)}
+.ins-a{box-shadow:0 3px 0 var(--accent)}
+.pn{flex:1 1 100%;display:grid;grid-template-columns:14px minmax(40px,70px) minmax(54px,76px) auto 26px;gap:7px;align-items:end;justify-content:start}
+.pn.solo{grid-template-columns:minmax(40px,74px) minmax(54px,80px) auto}
+.rg{display:flex;gap:6px;align-items:end;border:1px solid var(--line);border-radius:6px;background:var(--bg);padding:3px 6px 5px;margin-bottom:-6px}
+.rg .f:first-child{width:50px}
+.mmx .rg .f:first-child{width:58px}
+.rg .f:first-child input{background:var(--panel)}
+.rg.off .ck span,.rg.off .ck input{opacity:.45}
+.pn{padding-bottom:4px}
+.tl{flex:1 1 100%;display:grid;grid-template-columns:minmax(40px,64px) minmax(52px,76px) 26px;justify-content:start;gap:8px;align-items:end}
+.tl .f span{white-space:nowrap;font-size:10.5px;letter-spacing:.02em}
+.tl input[type=number]{width:100%}
+.tl .btn.x{padding:6px 0;text-align:center}
+.tl.ind,.tla.ind{margin-left:22px}
+.tla{flex:1 1 100%;font-size:13px;margin-top:-2px}
+.mir{flex:1 1 100%;margin:0}
+@media (max-width:480px){.pn{grid-template-columns:14px repeat(2,minmax(0,1fr)) 26px}.pn.solo{grid-template-columns:repeat(2,minmax(0,1fr))}.rg{grid-column:1/-1;justify-self:start;margin-bottom:0}.pn .btn.x{grid-row:1;grid-column:4}}
+.pn input[type=number]{width:100%}
+.pn input:not([type=checkbox]){padding-inline:6px}
+.pn .f span{white-space:nowrap;font-size:10.5px;letter-spacing:.02em}
+.ck{align-items:center}
+.f.ck input{width:18px;height:18px;margin:7px 0}
+.f.ck span{font-size:10.5px;letter-spacing:.02em}
+.mmx{margin-bottom:6px}
+.mmx .rg .f:first-child input{width:100%}
+.pn .btn.x{padding:6px 0;text-align:center}
+.chk{flex:1 1 100%;display:flex;gap:8px;align-items:center;font-size:13.5px}
+.chk input{width:auto}
+.insx{flex-wrap:wrap;align-items:center;gap:6px 14px}
+.insx .chk{flex:0 0 auto}
+.insx .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.chk.warnline{color:var(--warn);font-weight:500}
+.nothing{margin:0;padding:10px 12px;border:1px dashed var(--line);border-radius:5px;font-size:14px}
+.lnk{all:unset;cursor:pointer;color:var(--accent);text-decoration:underline;font-weight:500}
+.lnk.add{color:var(--ok)}
+.lnk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.total{font-size:13.5px;color:var(--muted)}
+.total b{color:var(--ink);font-family:var(--mono);font-weight:500}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* plan */
+.exp{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center}
+.sum{display:flex;flex-wrap:wrap;gap:6px 26px;font-size:14px;color:var(--muted)}
+.sum b{font:500 20px var(--mono);color:var(--ink);margin-right:6px;font-variant-numeric:tabular-nums}
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.checks li{display:flex;gap:10px;align-items:baseline;font-size:14px}
+.tag{flex:none;font:600 11px var(--display);letter-spacing:.1em;text-transform:uppercase;border:1px solid currentColor;border-radius:3px;padding:1px 6px;width:52px;text-align:center}
+.tag.warn{color:var(--warn);background:var(--warn-bg)} .tag.ok{color:var(--ok)} .tag.info{color:var(--info)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--c);margin-right:5px;vertical-align:-1px}
+.scroll{overflow-x:auto;max-width:100%}
+.bay{background:var(--bay);color:var(--bay-ink);border:1px solid var(--bay-line);border-radius:4px;padding:10px clamp(6px,1.2cqw,14px) 12px;width:100%;min-width:540px;container-type:inline-size;display:flex;flex-direction:column;gap:8px}
+.over{color:var(--warn);margin-left:8px}
+.bay-name{font:600 13px var(--display);letter-spacing:.14em;text-transform:uppercase}
+.grid{display:grid;row-gap:2px;column-gap:clamp(1px,.18cqw,2px)}
+.nsel{font:500 clamp(9.5px,1.1cqw,11.5px) var(--body);padding:2px 2px;background:var(--bay);color:var(--bay-ink);border:1px solid var(--bay-line);border-radius:3px;width:100%;min-width:0}
+.nsel:disabled{opacity:.4}
+.grp{background:var(--strip);color:var(--strip-ink);font:600 clamp(9px,1.12cqw,12px)/1 var(--display);letter-spacing:.04em;text-transform:uppercase;text-align:center;white-space:nowrap;overflow:hidden;height:20px;display:flex;align-items:center;justify-content:center;border-top:3px solid var(--c);padding:0 2px;cursor:grab;touch-action:none;min-width:0}
+.grp.m{border-top:0;border-bottom:3px solid var(--c)}
+.grp.tight{font-size:clamp(7px,.86cqw,9.5px);letter-spacing:-.01em;padding:0}
+.gfree{background:var(--strip);opacity:.28;height:20px}
+.pt{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;width:100%;min-width:0;border-radius:2px}
+.pt:hover{background:var(--bay-line)}
+.pt[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px}
+.pt:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.strip{background:var(--strip);color:var(--strip-ink);width:100%;height:17px;font:600 clamp(7.5px,1.05cqw,11.5px)/1 var(--display);display:flex;align-items:center;justify-content:center;white-space:nowrap;overflow:hidden}
+.strip.empty{opacity:.28}
+.nm{font:400 clamp(6.5px,.86cqw,9.5px)/1.25 var(--mono);color:var(--bay-ink);font-variant-numeric:tabular-nums;opacity:.8;min-width:86%;text-align:center;border:1px solid transparent;border-radius:2px;position:relative}
+.nm.can{cursor:pointer;opacity:1}
+.nm.HN{border-color:var(--bay-ink)}
+.nm.FN{background:var(--bay-ink);border-color:var(--bay-ink);color:var(--bay)}
+.nm.set::after{content:'';position:absolute;top:-3px;right:-3px;width:4px;height:4px;border-radius:50%;background:var(--bay-accent)}
+.jack{width:min(11px,80%);aspect-ratio:1;border-radius:50%;background:var(--jack);border:clamp(1px,.2cqw,2px) solid var(--bay-line)}
+.jack.on{border-color:var(--c)}
+.bay{user-select:none;-webkit-user-select:none}
+.strip[data-cl]{cursor:grab;touch-action:none}
+body.dragging .grp{cursor:grabbing}
+.strip.moved{box-shadow:inset 0 0 0 2px var(--accent)}
+.strip.sel{background:var(--accent);color:var(--accent-ink)}
+.strip.lift{opacity:.3}
+.strip.ok,.strip.bad{opacity:1}
+.strip.ok{background:var(--ok)}
+.strip.bad{background:var(--warn)}
+body.dragging,body.dragging .strip[data-cl]{cursor:grabbing}
+#led{position:fixed;z-index:15;box-sizing:border-box;height:26px;padding:0 6px;font:600 13px var(--display);text-align:center;text-transform:uppercase;background:var(--panel);color:var(--ink);border:2px solid var(--accent);border-radius:3px;outline:0}
+.pn .pcont{grid-column:2/-1;margin:-2px 0 2px}
+.pn.solo .pcont{grid-column:1/-1}
+#panels[hidden]{display:none}
+.xp{margin-top:14px}
+.xp-name{font:600 13px var(--display);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px}
+.xp-name span{color:var(--muted);font-weight:500;letter-spacing:.04em;margin-left:8px;text-transform:none}
+.xsvg{display:block;width:100%;min-width:620px;height:auto}
+.xg,.xn{font-family:var(--display);font-weight:600;text-anchor:middle;fill:var(--strip-ink)}
+.xg{font-size:3.6px;letter-spacing:.3px}
+.xn{font-size:4.2px}
+#tip{position:fixed;z-index:20;pointer-events:none;background:var(--ink);color:var(--panel);font:400 12.5px/1.35 var(--body);padding:5px 9px;border-radius:4px;max-width:340px;white-space:pre-line}
+#ghost{position:fixed;z-index:10;pointer-events:none;background:var(--accent);color:var(--accent-ink);font:500 12.5px var(--body);padding:3px 8px;border-radius:3px;white-space:nowrap}
+.norm{width:2px;height:10px;background:transparent}
+.norm.FN{background:var(--bay-ink)}
+.norm.HN{background:repeating-linear-gradient(var(--bay-ink) 0 3px,transparent 3px 5px)}
+.detail{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;font-size:14px;margin:0}
+.detail dt{color:var(--muted);font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;padding-top:2px}
+.detail dd{margin:0}
+.mono{font-family:var(--mono);font-size:13px}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:600 11.5px var(--display);letter-spacing:.09em;text-transform:uppercase;color:var(--muted);text-align:left}
+th,td{padding:6px 14px 6px 0;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+td.wrapc{white-space:normal;min-width:150px}
+td .u{color:var(--warn)}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+</style>
+
+<div id="ghost" hidden></div>
+<div id="tip" role="tooltip" hidden></div>
+<div class="wrap">
+  <header>
+    <h1>Studio Patch Planner</h1>
+    <p>Answer the questions; the bay layout and checks update as you go. It opens with one room with two panels, one converter, and no channels yet. Fill in the counts to match your studio.</p>
+  </header>
+  <div class="cols">
+    <section class="col ask" aria-label="Interview">
+      <h2>Interview</h2>
+      <div class="card" id="proj">
+        <label class="f"><span>Project name</span><input id="proj-name" maxlength="60" placeholder="Untitled studio"></label>
+        <div class="exp"><button class="btn primary" id="proj-save" type="button">Save file</button><button class="btn" id="proj-open" type="button">Open file</button><button class="btn" id="proj-new" type="button" data-tip="Start new project">New</button><button class="btn" id="proj-demo" type="button" data-tip="Load an example studio">Demo</button><input type="file" id="proj-file" accept=".json,application/json" hidden></div>
+        <p class="hint" id="proj-restore" hidden><button class="lnk" type="button" id="proj-restore-btn">Restore last session</button> <span id="proj-restore-info"></span></p>
+        <p class="hint" id="proj-msg" role="status">Every visit starts with a new project. Your changes are kept in this browser as you work.</p>
+      </div>
+      <div class="card" id="form"></div>
+    </section>
+    <section class="col" aria-label="Plan">
+      <h2>Generated plan</h2>
+      <div class="card" id="summary"></div>
+      <div class="card" id="bays"></div>
+      <div class="card" id="panels" hidden></div>
+      <div class="card" id="export">
+        <h2>Export</h2>
+        <p class="hint">The bay overview as a PDF on A4 landscape, two bays per page. Or an Excel workbook with every bay point and the checks.</p>
+        <div class="exp"><button class="btn primary" id="pdf" type="button">Save bay overview PDF</button><button class="btn" id="dl" type="button">Download spreadsheet</button><span class="hint" id="dlmsg" role="status"></span></div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+const ROOM_TYPES=['Live room','Booth','Iso room','Machine room'];
+const STEPS=['Rooms','House rules','Preamps','Converters','Outboard','Monitoring'];
+
+const S={step:0,sel:0,norm:{},pn:{},lab:{},
+ rooms:[{id:'r1',name:'Live Room',panels:[{label:'',lines:0,cue:0},{label:'',lines:0,cue:0}]}],
+ pre:[],
+ ob:[],
+ tie:[],
+ conv:[{name:'Converter 1',label:'',ad:0,da:0}],console:'none',conCh:24,spk:2,cue:2,loom:'dsub',spare:10,bays:0,monBay:true,monOff:false,monPair:0,convSum:false,moves:{},fmt:'bantam',name:'',mm:{on:false,ins:4,inSt:false,outs:2,outSt:true,src:'da'}};
+
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const range=n=>Array.from({length:Math.max(0,n)},(_,i)=>i);
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,parseInt(v,10)||0));
+const short=name=>{const w=String(name).trim().split(/\s+/).filter(Boolean);if(!w.length)return 'RM';return (w.length>1?w.map(x=>x[0]).join(''):w[0].slice(0,3)).toUpperCase().slice(0,4)};
+const uid=p=>p+Math.random().toString(36).slice(2,8),newTie=()=>({id:uid('t'),label:'',n:0,to:'pb'});
+const gidx=(ri,pi)=>S.rooms.slice(0,ri).reduce((a,r)=>a+r.panels.length,0)+pi,letter=g=>String.fromCharCode(65+g%26);
+const chl=(n,i)=>n===1?'':n===2?' '+'LR'[i]:' '+(i+1);
+const BW=()=>S.fmt==='jack'?24:48,FMT=()=>S.fmt==='jack'?'jack 2 × 24':'bantam 2 × 48';
+const adN=()=>S.conv.reduce((a,u)=>a+u.ad,0),daN=()=>S.conv.reduce((a,u)=>a+u.da,0);
+const autoLabel=n=>{const w=String(n||'').trim().split(/\s+/).filter(Boolean),cl=x=>x.toUpperCase().replace(/[^A-Z0-9]/g,'');if(!w.length)return 'UNIT';
+ const num=w.find((x,k)=>/\d/.test(x)&&(k>0||w.length===1))||w.find(x=>/\d/.test(x));
+ return (num?cl(num).slice(0,8):cl(w.length>1?w.slice(1).join(''):w[0]).slice(0,6))||'UNIT'};
+const lab=it=>(it.label||'').trim()||autoLabel(it.name);
+const devName=it=>(it.name||'').trim()||lab(it);
+
+function build(){
+ const P=(l,dev,conn,io,bal=true)=>({l,dev,conn,io,bal});
+ const G=(arr,gt,gs,plf)=>{let n=0;arr.forEach(x=>{if(x){x.gt=gt;x.gs=gs;x.pl=String(plf(n++))}});return arr},LRn=(st,i)=>st?(Math.floor(i/2)+1)+'LR'[i%2]:i+1,chS=(n,i)=>n===2?'LR'[i]:String(i+1);
+ const K=(cl,cn,arr,nn)=>{let n=0;arr.forEach(x=>{if(x){x.cl=cl;x.cn=cn;x.pid=cl+'#'+(n++);if(nn)x.nn=true}});return arr};
+ const PX=[];S.rooms.forEach(r=>r.panels.forEach(pn=>{const g=PX.length,lb=(pn.label||'').trim()||letter(g);const pv=PX[g-1],on=!!(pn.cont&&pv);PX.push({r,pn,g,lb,dev:r.name+' panel '+lb,mo:on?pv.mo+(+pv.pn.lines||0):0,ro:on?pv.ro+(+pv.pn.cue||0):0})}));
+ const micLines=PX.flatMap(x=>K('mic:'+x.g,x.r.name+' '+x.lb+' mic lines',G(range(x.pn.lines).map(i=>P(x.lb+' '+(x.mo+i+1),x.dev,'XLR-F','out')),x.r.name+' '+x.lb,x.lb,i=>x.mo+i+1)));
+ const mkCue=x=>K('ret:'+x.g,x.r.name+' '+x.lb+' returns',G(range(x.pn.cue*(x.pn.stereo?2:1)).map(i=>P(x.lb+' RET '+(x.pn.stereo?(x.ro+Math.floor(i/2)+1)+'LR'[i%2]:x.ro+i+1),x.dev,'XLR-M','in')),x.r.name+' '+x.lb+' returns',x.lb+' RET',i=>x.pn.stereo?(x.ro+Math.floor(i/2)+1)+'LR'[i%2]:x.ro+i+1));
+ const cueDirect=PX.filter(x=>x.pn.direct).flatMap(mkCue),cueLines=PX.filter(x=>!x.pn.direct).flatMap(mkCue);
+ const preIn=S.pre.flatMap((u,ui)=>K('prei:'+ui,devName(u)+' inputs',G(range(u.ch).map(i=>P(lab(u)+(u.ch>1?' '+(i+1):''),devName(u),'XLR-M','in')),devName(u)+' in',lab(u),i=>i+1)));
+ const mxO=(u,n,tag)=>u.mixer?range(n||0).map(i=>P(lab(u)+' '+tag+(i+1),devName(u),'Line','out')):[];
+ const preOut=S.pre.flatMap((u,ui)=>K('preo:'+ui,devName(u)+' outputs',G(range(u.ch).map(i=>P(lab(u)+(u.ch>1?' '+(i+1):''),devName(u),'XLR-F','out')),devName(u)+' out',lab(u),i=>i+1)));
+ const mixEnd=S.pre.flatMap((u,ui)=>{const mono=u.mixer?(u.sends||0):0;return [...K('mxs:'+ui,devName(u)+' aux sends',G([...mxO(u,u.sends,'AUX '),...(u.mixer?range((u.stSends||0)*2).map(i=>P(lab(u)+' ST AUX '+(Math.floor(i/2)+1)+'LR'[i%2],devName(u),'Line','out')):[])],devName(u)+' aux','AUX',i=>i<mono?i+1:'S'+LRn(true,i-mono)),1),...K('mxg:'+ui,devName(u)+' groups',G(mxO(u,u.groups,'GRP '),devName(u)+' group','GRP',i=>i+1),1),...K('mxo:'+ui,devName(u)+' outputs',G(mxO(u,u.outs,'OUT '),devName(u)+' mix out','MIX',i=>i+1),1)]});
+ const obTop=[],obBot=[];
+ S.ob.forEach((u,ui)=>{const w=Math.max(u.i,u.o),a=[],b=[];for(let i=0;i<w;i++){a.push(i<u.o?P(lab(u)+chl(u.o,i),devName(u),'Line','out'):null);b.push(i<u.i?P(lab(u)+chl(u.i,i),devName(u),'Line','in'):null)}G(a,devName(u),lab(u),i=>chS(u.o,i));G(b,devName(u),lab(u),i=>chS(u.i,i));K('ob:'+ui,devName(u),[...a,...b],1);obTop.push(...a);obBot.push(...b)});
+ const obOuts=obTop.filter(Boolean).length,obIns=obBot.filter(Boolean).length;
+ const cvP=u=>(u.label||'').trim()?u.label.trim()+' ':'',cvD=u=>(u.name||'').trim()||'Converter';
+ const cvOff=[];{let a0=0,d0=0;S.conv.forEach((u,ui)=>{if(ui===0||!u.cont){a0=0;d0=0}cvOff.push([a0,d0]);a0+=u.ad;d0+=u.da})}
+ const ad=S.conv.flatMap((u,ui)=>K('ad:'+ui,cvD(u)+' inputs',G(range(u.ad).map(i=>P(cvP(u)+'IN '+(cvOff[ui][0]+i+1),cvD(u)+' input','D-sub','in')),cvD(u)+' input',cvP(u)+'IN',i=>cvOff[ui][0]+i+1)));
+ const da=S.conv.flatMap((u,ui)=>K('da:'+ui,cvD(u)+' outputs',G(range(u.da).map(i=>P(cvP(u)+'OUT '+(cvOff[ui][1]+i+1),cvD(u)+' output','D-sub','out')),cvD(u)+' output',cvP(u)+'OUT',i=>cvOff[ui][1]+i+1)));
+ const monIn=K('mon','Monitor controller input',G([P('MON IN L','Monitor controller','XLR-M','in'),P('MON IN R','Monitor controller','XLR-M','in')],'Monitor in','MON',i=>'LR'[i]));
+ const L='ABCDEFGH';
+ const monOut=range(S.spk).flatMap(s=>[0,1].map(i=>P('MON '+L[s]+' '+'LR'[i],'Monitor controller','XLR-F','out')));
+ const spk=range(S.spk).flatMap(s=>[0,1].map(i=>P('SPK '+L[s]+' '+'LR'[i],'Speaker set '+L[s],'XLR-M','in')));
+ const con=S.console==='console';
+ const blocks=[];const B=(name,color,normal,top,bottom)=>blocks.push({name,color,normal,top,bottom});
+ const MM=S.mm&&S.mm.on?S.mm:null;
+ const mmIn=MM?K('mmi','Cue mixer inputs',G(range(MM.ins*(MM.inSt?2:1)).map(i=>P('CUE IN '+(MM.inSt?(Math.floor(i/2)+1)+'LR'[i%2]:i+1),'Cue mixer','Line','in')),'Cue mixer in','CUE IN',i=>LRn(MM.inSt,i))):[];
+ const mmOut=MM?K('mmo','Cue mixer outputs',G(range(MM.outs*(MM.outSt?2:1)).map(i=>P('CUE OUT '+(MM.outSt?(Math.floor(i/2)+1)+'LR'[i%2]:i+1),'Cue mixer','Line','out')),'Cue mixer out','CUE OUT',i=>LRn(MM.outSt,i))):[];
+ const mmPend=MM&&MM.src==='sends'?mmIn.slice():[];
+ const underSends=(top,bot)=>{top.forEach((x,k)=>{if(x&&x.cl.startsWith('mxs:')&&mmPend.length&&!bot[k]){const y=mmPend.shift();y.yn=true;bot[k]=y}});return bot};
+ const ME=()=>{if(mixEnd.length)blocks.push({name:'Mixer aux sends, groups and outputs',color:5,normal:'NN',top:mixEnd,bottom:underSends(mixEnd,Array(mixEnd.length).fill(null)),end:true})};
+ B('Mic lines / preamp in',1,'FN',micLines,preIn);
+ const mixIn=MM&&MM.src==='da'?mmIn:[],cueDst=[...mixIn,...cueDirect];
+ const mp=Math.max(0,Math.min(S.monPair,Math.floor(daN()/2)-1))*2,isMon=i=>i===mp||i===mp+1;
+ let daTop=da.map((x,i)=>S.monOff&&isMon(i)?null:x),monIdx=[mp,mp+1];
+ if(S.monOff&&!S.monBay){daTop=daTop.filter(Boolean);monIdx=[]}
+ const daBot=Array(daTop.length).fill(null);
+ if(S.monBay&&da.length)monIdx.forEach((ix,k)=>{while(daBot.length<=ix){daBot.push(null);daTop.push(null)}daBot[ix]=monIn[k]});
+ const freeDA=daTop.map((x,i)=>x&&!(monIdx.length&&isMon(i))?i:-1).filter(i=>i>=0),slots=freeDA.slice(-cueDst.length);
+ const cueSrc=cueDst.map((x,k)=>{const ix=k-(cueDst.length-slots.length);if(ix>=0){daBot[slots[ix]]=x;return daTop[slots[ix]].l}daBot.push(x);daTop.push(null);return null});
+ const daOn=daTop.filter(Boolean).length,daUsed=daTop.filter((x,i)=>x&&daBot[i]).length,cueOver=cueSrc.filter(x=>!x).length;
+ const span=(a,b)=>a&&b?(a===b?a:a+' to '+b):'no free converter output';
+ let adNeed;
+ if(con){
+  const n=S.conCh;
+  B('Preamp out / console line in',2,'HN',preOut,range(n).map(i=>P('LINE '+(i+1),'Console','D-sub','in')));
+  ME();
+  B('Console direct out / converter in',3,'HN',range(n).map(i=>P('DIR '+(i+1),'Console','D-sub','out')),ad);
+  B('Aux send / console return',5,'NN',range(6).map(i=>P('AUX '+(i+1),'Console','D-sub','out')),range(8).map(i=>P('RET '+(i+1),'Console','D-sub','in')));
+  adNeed=n;
+ }else{
+  const fw=Math.ceil(Math.max(8,Math.ceil(Math.max(preOut.length,ad.length)*(1+S.spare/100)/8)*8)/BW())*BW();
+  if(mixEnd.length&&preOut.length+mixEnd.length<=fw){mixEnd.forEach(x=>x.nn=true);blocks.push({name:'Preamp out, mixer aux, groups and outputs / converter in',color:2,normal:'HN',top:[...preOut,...Array(fw-preOut.length-mixEnd.length).fill(null),...mixEnd],bottom:underSends([...preOut,...Array(fw-preOut.length-mixEnd.length).fill(null),...mixEnd],[...ad,...Array(Math.max(0,fw-ad.length)).fill(null)]),fw})}
+  else{B('Preamp out / converter in',2,'HN',preOut,ad);ME()}
+  adNeed=preOut.length;
+ }
+ const insTop=[],insBot=[];
+ S.pre.forEach((u,ui)=>{if(!u.mixer)return;const add=(on,cl,what,n,tag)=>{if(!on||!n)return;const a=[],b=[];for(let i=0;i<n;i++){const t=lab(u)+' '+tag(i);a.push(P(t+' SEND',devName(u),'Line','out'));b.push(P(t+' RETURN',devName(u),'Line','in'))}const w2={channel:['',''],group:[' group','GRP '],output:[' out','OUT ']}[what];G(a,devName(u)+w2[0]+' insert send',lab(u)+' '+w2[1]+'S',i=>i+1);G(b,devName(u)+w2[0]+' insert return',lab(u)+' '+w2[1]+'R',i=>i+1);K(cl+':'+ui,devName(u)+' '+what+' inserts',[...a,...b]);insTop.push(...a);insBot.push(...b)};
+  add(u.insCh,'mxic','channel',u.ch,i=>String(i+1));add(u.insGrp,'mxig','group',u.groups||0,i=>'G'+(i+1));add(u.insOut,'mxio','output',u.outs||0,i=>'O'+(i+1))});
+ if(insTop.length)B('Mixer inserts, outboard out / outboard in',7,'HN',[...insTop,...obTop],[...insBot,...obBot]);
+ else B('Outboard out / outboard in',7,'NN',obTop,obBot);
+ B('Converter out / monitor, room returns',4,'HN',daTop,daBot);
+ if(mmPend.length)B('Cue mixer in',6,'NN',[],mmPend.slice());
+ if(MM)B('Cue mixer out / room returns',6,'HN',mmOut,cueLines);
+ else if(cueLines.length)B('Room returns',6,'NN',[],cueLines);
+ const tieTop=[],TIES=[];
+ PX.forEach(x=>{const n=+x.pn.tie||0;if(!n)return;TIES.push({from:x.r.name,panel:x.lb,lb:x.lb+' TIE',n,to:'Patchbay',bay:true});tieTop.push(...K('tie:'+x.g,x.r.name+' '+x.lb+' tie lines',G(range(n).map(i=>P(x.lb+' TIE '+(i+1),x.dev,'Line','out')),x.r.name+' '+x.lb+' tie',x.lb+' TIE',i=>i+1),1))});
+ B('Tie lines',8,'NN',tieTop,[]);
+
+ const cols=[];
+ blocks.forEach((b,bi)=>{const len=Math.max(b.top.length,b.bottom.length);if(!len)return;
+  b.w=b.fw||Math.max(8,Math.ceil(len*(1+S.spare/100)/8)*8);
+  if(b.end){b.w=Math.ceil(len/8)*8;b.top=[...Array(b.w-len).fill(null),...b.top];if(b.bottom.length)b.bottom=[...Array(b.w-len).fill(null),...b.bottom];const pad=(BW()-(cols.length+b.w)%BW())%BW();for(let k=0;k<pad;k++)cols.push({b:-1,t:null,m:null,n:'NN'})}
+  if(/converter in$|^Converter out/.test(b.name)){const rem=BW()-cols.length%BW();if(rem<BW())for(let k=0;k<rem;k++)cols.push({b:-1,t:null,m:null,n:'NN'})}
+  b.start=cols.length;
+  for(let i=0;i<b.w;i++){const t=b.top[i]||null,m=b.bottom[i]||null;const nk=b.name+':'+Math.floor(i/8);[t,m].forEach(x=>{if(x){x.c=b.color;x.sec=b.name}});cols.push({b:bi,t,m,nk,sug:b.normal,n:'NN'})}});
+ const freeCol=()=>({b:-1,t:null,m:null,n:'NN'}),moved=new Set(),stale=[];
+ cols.forEach((c,g)=>{if(c.t)c.t.ag=g;if(c.m)c.m.ag=g});
+ const mk=Object.keys(S.moves),held=[],grow=n=>{while(cols.length<n||cols.length%BW())cols.push(freeCol())};
+ mk.filter(k=>k.includes('#')&&S.moves[k]>=0).forEach(k=>cols.forEach((c,g)=>['t','m'].forEach(r=>{if(c[r]&&c[r].pid===k){held.push({k,r,g,x:c[r]});c[r]=null}})));
+ mk.filter(k=>!k.includes('#')).forEach(cl=>{const cells=[];cols.forEach((c,g)=>{if(c.t&&c.t.cl===cl)cells.push([g,'t']);if(c.m&&c.m.cl===cl)cells.push([g,'m'])});
+  const T=S.moves[cl];if(!cells.length||T<0)return;
+  const g0=Math.min(...cells.map(x=>x[0]),...held.filter(h=>h.x.cl===cl).map(h=>h.g)),w=Math.max(...cells.map(x=>x[0]))-g0+1;grow(T+w);
+  if(cells.some(([g,r])=>{const d=cols[T+g-g0][r];return d&&d.cl!==cl})){stale.push(cols[cells[0][0]][cells[0][1]].cn);return}
+  const pts=cells.map(([g,r])=>{const x=cols[g][r];cols[g][r]=null;return x});cells.forEach(([g,r],i)=>{cols[T+g-g0][r]=pts[i]});moved.add(cl)});
+ held.forEach(h=>{const T=S.moves[h.k];grow(T+1);if(!cols[T][h.r]){cols[T][h.r]=h.x;moved.add(h.k);return}
+  stale.push(h.x.l);let g=cols[h.g][h.r]?cols.findIndex(c=>!c[h.r]):h.g;if(g<0){g=cols.length;grow(g+1)}cols[g][h.r]=h.x});
+ const assigned=cols.reduce((a,c)=>a+(c.t?1:0)+(c.m?1:0),0);
+ const need=Math.max(1,Math.ceil(cols.length/BW())),nb=Math.max(need,S.bays||0);
+ while(cols.length<nb*BW())cols.push(freeCol());
+ cols.forEach((c,g)=>{if(!c.nk){c.nk='free:'+Math.floor(g/8);c.sug='NN'}const t=c.t,m=c.m,k=t&&m?t.pid+'|'+m.pid:null;c.nsug=k?((t.yn||m.yn)?'HN':(t.nn||m.nn)?'NN':c.sug):'NN';c.nset=!!(k&&S.pn[k]&&S.pn[k]!==c.nsug);c.n=k?(S.pn[k]||c.nsug):'NN'});
+
+
+
+ const checks=[];const C=(lvl,t)=>checks.push({lvl,t});
+ if(S.bays&&need>S.bays)C('warn',`The plan needs ${need} bays but you have ${S.bays}. Bays marked "over" do not exist yet: lower the spare capacity, cut lines, or add ${need-S.bays} more.`);
+ else if(S.bays)C('ok',`Patchbays: ${need} of ${S.bays} used${S.bays>need?', '+(S.bays-need)+' completely free':''}.`);
+ stale.forEach(n=>C('warn',`${n} could not stay where you dragged it, because those points are now taken. It is shown at its automatic position.`));
+ if(moved.size)C('info',`${moved.size} ${moved.size>1?'items are':'item is'} placed by hand. Reset layout puts everything back.`);
+ const adU=cols.filter(c=>c.m&&/^ad:/.test(c.m.cl||'')&&c.n!=='NN').length,daU=cols.filter(c=>c.t&&/^da:/.test(c.t.cl||'')&&c.n!=='NN').length;
+ if(preOut.length>ad.length)C('warn',`${preOut.length} preamp outputs but only ${ad.length} converter inputs.`);
+ if(adN())C('ok',`Converter inputs: ${adU} of ${adN()} normalled, ${adN()-adU} free.`);
+ if(cueOver)C('warn',`${cueOver} room ${cueOver>1?'returns have':'return has'} no converter output left to feed ${cueOver>1?'them':'it'}.`);
+ if(daOn)C('ok',`Converter outputs: ${daU} of the ${daOn} on the bay are normalled, ${daOn-daU} free.`);
+ if(S.monOff&&daN()>=2)C('info',`Stereo ${mp+1}-${mp+2} (${da[mp].l} and ${da[mp+1].l}) is wired straight to the monitor controller and is not on the converter output strip.`);
+ if(!S.monBay)C('info','The monitor controller input is not on the patchbay.');
+ if(obOuts+obIns)C('info',`Outboard is not normalled: ${obOuts} outs and ${obIns} ins sit on the bay for patching.`);
+ if(tieTop.length)C('info',`${tieTop.length} tie lines sit in their own section with no normal, apart from preamps and converters.`);
+ TIES.filter(t=>!t.bay).forEach(t=>C('info',`${t.from} to ${t.to}: ${t.n} tie ${t.n>1?'lines run':'line runs'} room to room (${t.lb}) and ${t.n>1?'are':'is'} not on the patchbay.`));
+ if(MM){const left=mmPend.length;
+  C('info',`Cue mixer: its ${MM.outs} ${MM.outSt?'stereo ':''}outputs (${mmOut.length} channels) sit above the room returns${cueLines.length?'':' (no room returns are set yet)'}, and its ${MM.ins} ${MM.inSt?'stereo ':''}inputs (${mmIn.length} channels) come from ${MM.src==='da'?(mixIn.length?span(cueSrc[0],cueSrc[mixIn.length-1]):'the converter outputs'):'the mixer aux sends'}.`);
+  if(MM.src==='sends'&&left)C('warn',`${left} cue mixer ${left>1?'inputs have':'input has'} no free aux send to sit under. Tick a mixer in Preamps or raise its aux sends.`);
+  if(cueLines.length>mmOut.length)C('info',`${cueLines.length-mmOut.length} room return channels have no cue mixer output above them.`)}
+ if(cueDirect.length)C('info',`Direct room returns are fed from ${span(cueSrc[mixIn.length],cueSrc[cueDst.length-1])}.`);
+ if(cueLines.length&&!MM)C('info',`${cueLines.length} room returns sit in their own section with no normal. Nothing feeds them until you patch.`);
+ if(insTop.length)C('info',`${insTop.length} mixer inserts share a section with the outboard, each with its send above its return.`);
+ S.pre.filter(u=>u.mixer).forEach(u=>C('info',`${devName(u)} is a mixer: its ${u.sends||0} mono aux sends, ${u.stSends||0} stereo aux sends, ${u.groups||0} group outs and ${u.outs||0} outputs start from the far end of the bay, finishing on point ${BW()}, and are not normalled unless you set it on the bay.`));
+ if(con&&preOut.length>S.conCh)C('warn',`${preOut.length} preamp channels but ${S.conCh} console line inputs.`);
+ if(micLines.length>preIn.length)C('info',`${micLines.length-preIn.length} mic lines have no preamp normalled. They stay on the bay for patching.`);
+ if(preIn.length>micLines.length)C('info',`${preIn.length-micLines.length} preamp inputs have no mic line normalled.`);
+ if(micLines.length)C('info','Mic lines sit on the patchbay. Keep phantom off while patching, or give them a bay of their own.');
+ {const LB=S.lab||{};cols.forEach(c=>['t','m'].forEach(r=>{const x=c[r];if(!x)return;x.agt=String(x.gt||x.cn||x.dev||'');x.apl=x.pl==null?'':String(x.pl);const g=LB[x.cl+'~'+x.agt],q=LB[x.pid];
+  if(g!=null){x.gt=x.gs=g}if(q!=null)x.pl=q;if(g!=null||q!=null)x.l=((g!=null?g:(x.gs||x.agt))+' '+x.pl).trim()}))}
+ return {blocks,cols,checks,nb,assigned,moved,ties:TIES};
+}
+
+/* ---------- interview ---------- */
+const tools=(list,i,n)=>`<div class="tools"><span class="grip" data-list="${list}" data-i="${i}" data-tip="Drag to reorder"></span></div>`;
+const numF=(g,i,p,lbl,v,min)=>`<label class="f"><span>${lbl}</span><input type="number" min="${min}" max="128" id="${g}-${i}-${p}" value="${v}" data-a="gear" data-g="${g}" data-i="${i}" data-p="${p}"></label>`;
+const convDup=i=>{const u=S.conv[i],lb=x=>(x.label||'').trim();return i>0&&!u.cont&&S.conv.slice(0,i).some(x=>lb(x)===lb(u))};
+const convNotes=()=>S.conv.forEach((u,i)=>{const n=document.getElementById('conv-'+i+'-contl');if(n)n.classList.toggle('warnline',convDup(i))});
+function tieRows(r,i,pn,j){const ind=r.panels.length>1?' ind':'',pl=letter(gidx(i,j)),plb=(pn.label||'').trim()||pl;
+ return (pn.ties||[]).map((t,k)=>{const id=`tl-${i}-${j}-${k}`,at=`data-a="tie" data-i="${i}" data-j="${j}" data-k="${k}"`;
+  return `<div class="tl${ind}"><label class="f"><span>Label</span><input id="${id}-label" maxlength="8" value="${esc(t.label||'')}" placeholder="${esc(plb)} TIE" ${at} data-p="label"></label>
+  <label class="f"><span>Tie lines</span><input type="number" min="0" max="96" id="${id}-n" value="${t.n}" ${at} data-p="n"></label>
+  <button class="btn x" type="button" data-c="rmtie" data-i="${i}" data-j="${j}" data-k="${k}" aria-label="Remove tie lines">×</button></div>`}).join('')+`<div class="tla${ind}"><button class="lnk add" type="button" data-c="addtie" data-i="${i}" data-j="${j}">+ Add tie lines</button></div>`}
+function mirrorText(i){const r=S.rooms[i],a=[];S.rooms.forEach(x=>{if(x===r)return;x.panels.forEach(pn=>(pn.ties||[]).forEach(t=>{if(t.n&&t.to===r.id)a.push(t.n+' tie '+(t.n>1?'lines':'line')+' from '+(x.name||'Room'))}))});return a.join(', ')}
+function mirrorHTML(i){const t=mirrorText(i);return `<p class="hint mir" id="mir-${i}"${t?'':' hidden'}>Also here: ${esc(t)}. Entered on the other room.</p>`}
+function mirrors(){S.rooms.forEach((r,i)=>{const e=document.getElementById('mir-'+i);if(e){const t=mirrorText(i);e.hidden=!t;e.textContent=t?'Also here: '+t+'. Entered on the other room.':''}})}
+function totalHTML(g){const items=S[g],pre=g==='pre',cv=g==='conv';if(g==='tie')return `<b>${items.length}</b> groups, <b>${items.reduce((a,it)=>a+it.n,0)}</b> lines`;const tin=items.reduce((a,it)=>a+(pre?it.ch:cv?it.ad:it.i),0),tout=items.reduce((a,it)=>a+(pre?it.ch:cv?it.da:it.o),0);
+ return `<b>${items.length}</b> units, ${pre?`<b>${tin}</b> channels`:cv?`<b>${tin}</b> input, <b>${tout}</b> output`:`<b>${tin}</b> input, <b>${tout}</b> output`}`}
+function gearStep(g,q,hint){
+ const items=S[g],pre=g==='pre',cv=g==='conv',ti=g==='tie';
+ return `<p class="q">${q}</p>${hint?`<p class="hint">${hint}</p>`:''}<div class="rows">`+
+ items.map((it,i)=>`<div class="row u" data-row="${g}">${tools(g,i,items.length)}<div class="rb"><label class="f grow"><span>Name</span><input id="${g}-${i}-name" maxlength="40" value="${esc(it.name)}" placeholder="Make and model" data-a="gear" data-g="${g}" data-i="${i}" data-p="name"></label>
+ <label class="f lbl"><span>Label</span><input id="${g}-${i}-label" maxlength="8" value="${esc(it.label)}" placeholder="${g==='conv'?'':esc(autoLabel(it.name))}" data-a="gear" data-g="${g}" data-i="${i}" data-p="label"></label>
+ ${pre?numF(g,i,'ch','Channels',it.ch,1):cv?'':ti?numF(g,i,'n','Lines',it.n,0)+`<label class="f grow"><span>Row on the bay</span><select id="tie-${i}-row" data-a="gear" data-g="tie" data-i="${i}" data-p="row"><option value="t"${it.row!=='m'?' selected':''}>Top row</option><option value="m"${it.row==='m'?' selected':''}>Bottom row</option></select></label>`:`<div class="line">${numF(g,i,'i','Input',it.i,0)+numF(g,i,'o','Output',it.o,0)}</div>`}
+ ${pre?`<label class="chk"><input type="checkbox" id="${g}-${i}-mixer"${it.mixer?' checked':''} data-a="gear" data-g="${g}" data-i="${i}" data-p="mixer"><span>This is a mixer</span></label>`+(it.mixer?numF(g,i,'sends','Mono aux',it.sends,0)+numF(g,i,'stSends','Stereo aux',it.stSends||0,0)+numF(g,i,'groups','Groups',it.groups,0)+numF(g,i,'outs','Outputs',it.outs,0)+`<div class="line insx"><span class="cap">Inserts on</span>${[['insCh','Channels'],['insGrp','Groups'],['insOut','Outputs']].map(([k,t])=>`<label class="chk"><input type="checkbox" id="${g}-${i}-${k}"${it[k]?' checked':''} data-a="gear" data-g="${g}" data-i="${i}" data-p="${k}"><span>${t}</span></label>`).join('')}</div>`:''):''}
+ ${cv?`<div class="line">${numF(g,i,'ad','Input',it.ad,0)+numF(g,i,'da','Output',it.da,0)}<button class="btn x" data-c="rmgear" data-g="${g}" data-i="${i}" aria-label="Remove unit">Remove</button></div>${i>0?`<label class="chk${convDup(i)?' warnline':''}" id="conv-${i}-contl"><input type="checkbox" id="conv-${i}-cont"${it.cont?' checked':''} data-a="gear" data-g="conv" data-i="${i}" data-p="cont"><span>Continue numbering from the unit above</span></label>`:''}`:`<div class="line rmrow"><button class="btn x" data-c="rmgear" data-g="${g}" data-i="${i}" aria-label="Remove unit">Remove</button></div>`}</div></div>`).join('')+
+ (items.length?'':`<p class="hint">None added yet.</p>`)+`</div><div><button class="btn" data-c="addgear" data-g="${g}">Add unit</button></div>
+ <p class="total" id="total-${g}">${totalHTML(g)}</p>`;
+}
+function stepHTML(){
+ const s=[0,5,1,3,2,4][S.step];
+ if(s===0)return `<p class="q">Rooms and their XLR panels</p>
+ <div class="count"><button class="btn" data-c="roomcount" data-d="-1" aria-label="One room fewer">−</button><output id="roomcount">${S.rooms.length}</output><button class="btn" data-c="roomcount" data-d="1" aria-label="One room more">+</button></div>
+ <div class="rows">`+S.rooms.map((r,i)=>`<div class="row u" data-row="rooms">${tools('rooms',i,S.rooms.length)}<div class="rb"><label class="f grow"><span>Room name</span><input id="room-${i}-name" value="${esc(r.name)}" data-a="room" data-i="${i}" data-p="name"></label>
+ ${r.panels.map((pn,j)=>{const id=`pn-${i}-${j}`,at=`data-a="panel" data-i="${i}" data-j="${j}"`;return `<div class="pw${r.panels.length>1?'':' solo'}" data-row="pn:${i}"><div class="pnh" id="${id}-h">XLR panel ${esc((pn.label||'').trim()||letter(gidx(i,j)))}</div><div class="pn${r.panels.length>1?'':' solo'}">${r.panels.length>1?`<span class="grip" data-list="pn:${i}" data-i="${j}" data-tip="Drag to reorder"></span>`:''}
+  <label class="f" data-tip="XLR Panel Name"><span>Label</span><input id="${id}-label" maxlength="6" value="${esc(pn.label||'')}" placeholder="${letter(gidx(i,j))}" ${at} data-p="label"></label>
+  <label class="f"><span>Mic lines</span><input type="number" min="0" max="96" id="${id}-lines" value="${pn.lines}" ${at} data-p="lines"></label>
+  <div class="rg${pn.cue?'':' off'}" id="${id}-rg" role="group" aria-label="Returns"><label class="f"><span>Returns</span><input type="number" min="0" max="24" id="${id}-cue" value="${pn.cue}" ${at} data-p="cue"></label>
+  <label class="f ck" data-tip="Returns are stereo pairs"><span>Stereo</span><input type="checkbox" id="${id}-stereo"${pn.stereo?' checked':''}${pn.cue?'':' disabled'} ${at} data-p="stereo"></label>
+  <label class="f ck" data-tip="Returns direct from converter output"><span>Direct</span><input type="checkbox" id="${id}-direct"${pn.direct?' checked':''}${pn.cue?'':' disabled'} ${at} data-p="direct"></label></div>
+  ${r.panels.length>1?`<button class="btn x" type="button" data-c="rmpanel" data-i="${i}" data-j="${j}" aria-label="Remove panel ${letter(gidx(i,j))}">×</button>`:''}
+  ${gidx(i,j)>0?`<label class="chk pcont"><input type="checkbox" id="${id}-cont"${pn.cont?' checked':''} ${at} data-p="cont"><span>Continue numbering from the panel above</span></label>`:''}</div></div>`}).join('')}
+ <div><button class="btn" type="button" data-c="addpanel" data-i="${i}">Add XLR panel</button></div></div></div>`).join('')+`</div>`;
+ if(s===1)return gearStep('pre','How many preamps do you have?','');
+ if(s===2)return gearStep('ob','How much outboard do you have?','External FX, compressors and EQs together. Set input and output per unit, for example 1 input and 2 output, or 4 and 4.');
+ if(s===3)return gearStep('conv','How many converters do you have?','');
+ if(s===4)return `<p class="q">How is the monitor feed wired?</p><p class="hint">Choose whether the monitor controller input sits on the patchbay, and which converter output pair feeds it. A cue mixer puts its outputs above the room returns and takes its inputs from the converter outputs or from the mixer sends.</p>
+ <div class="row"><label class="chk"><input type="checkbox" id="set-monBay"${S.monBay?' checked':''} data-a="set" data-p="monBay"><span>Monitor controller input on the patchbay</span></label>
+ <label class="f grow"><span>Monitor feed comes from</span><select id="set-monPair" data-a="set" data-p="monPair">${range(Math.max(1,Math.floor(daN()/2))).map(i=>`<option value="${i}"${i===S.monPair?' selected':''}>Stereo ${i*2+1}-${i*2+2}</option>`).join('')}</select></label>
+ <label class="chk"><input type="checkbox" id="set-monOff"${S.monOff?' checked':''} data-a="set" data-p="monOff"><span>Remove these 2 outputs from the converter output strip (wired direct to the monitor controller)</span></label></div>
+ <div class="row"><label class="chk"><input type="checkbox" id="mm-on"${S.mm.on?' checked':''} data-a="mm" data-p="on"><span>Cue mixer</span></label>
+ ${S.mm.on?`<div class="line mmx"><div class="rg"><label class="f"><span>Inputs</span><input type="number" min="0" max="48" id="mm-ins" value="${S.mm.ins}" data-a="mm" data-p="ins"></label><label class="f ck"><span>Stereo</span><input type="checkbox" id="mm-inSt"${S.mm.inSt?' checked':''} data-a="mm" data-p="inSt"></label></div>
+ <div class="rg"><label class="f"><span>Outputs</span><input type="number" min="0" max="48" id="mm-outs" value="${S.mm.outs}" data-a="mm" data-p="outs"></label><label class="f ck"><span>Stereo</span><input type="checkbox" id="mm-outSt"${S.mm.outSt?' checked':''} data-a="mm" data-p="outSt"></label></div></div>
+ <label class="f grow"><span>Input comes from</span><select id="mm-src" data-a="mm" data-p="src"><option value="da"${S.mm.src==='da'?' selected':''}>Converter outputs</option><option value="sends"${S.mm.src==='sends'?' selected':''}>Aux sends from mixer</option></select></label>`:''}</div>`;
+ return `<p class="q">What are the house rules?</p><p class="hint">Choose the bay format and how much room to leave.</p>
+ <div class="row"><label class="f grow"><span>Patchbay format</span><select id="set-fmt" data-a="set" data-p="fmt"><option value="bantam"${S.fmt==='bantam'?' selected':''}>Bantam (TT) · 2 × 48 points</option><option value="jack"${S.fmt==='jack'?' selected':''}>Jack · 2 × 24 points</option></select></label></div>
+ <div class="row"> <label class="f grow"><span>Spare capacity</span><select id="set-spare" data-a="set" data-p="spare">${[0,10,20,30,50].map(v=>`<option value="${v}"${v===S.spare?' selected':''}>${v} %</option>`).join('')}</select></label></div>
+ <div class="row"><label class="f grow"><span>Patchbays you have</span><select id="set-bays" data-a="set" data-p="bays"><option value="0"${!S.bays?' selected':''}>Auto, as many as the plan needs</option>${range(12).map(i=>`<option value="${i+1}"${S.bays===i+1?' selected':''}>${i+1} × ${FMT()} (${(i+1)*BW()*2} points)</option>`).join('')}</select></label></div>`;
+}
+function renderForm(){
+ document.getElementById('form').innerHTML=`<ol class="steps">${STEPS.map((n,i)=>`<li><button data-c="step" data-i="${i}"${i===S.step?' aria-current="step"':''}><b>${i+1}</b>${n}</button></li>`).join('')}</ol>
+ ${stepHTML()}<div class="nav"><button class="btn" data-c="back"${S.step===0?' disabled':''}>Back</button><button class="btn primary" data-c="next"${S.step===STEPS.length-1?' disabled':''}>Next question</button></div>`;
+}
+
+/* ---------- plan ---------- */
+const colTrack=i=>i+Math.floor(i/8)+1;
+const pos=(g,r)=>`B${Math.floor(g/BW())+1} ${r==='t'?'top':'bot'} ${g%BW()+1}`;
+function fitGroups(){document.querySelectorAll('#bays .grp').forEach(e=>{e.classList.remove('tight');e.textContent=e.dataset.full;delete e.dataset.tip;if(e.scrollWidth>e.clientWidth){e.textContent=e.dataset.short;e.dataset.tip=e.dataset.full;if(e.scrollWidth>e.clientWidth)e.classList.add('tight')}})}
+addEventListener('resize',()=>fitGroups());if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>fitGroups());
+let PLAN,justDragged=false,ANCH=null;const SEL=new Set();
+const UN=[],RE=[],snap=()=>JSON.stringify({m:S.moves,n:S.pn,l:S.lab});
+function mark(){UN.push(snap());if(UN.length>200)UN.shift();RE.length=0}
+function histClear(){UN.length=0;RE.length=0}
+function hist(from,to){if(!from.length)return false;to.push(snap());const o=JSON.parse(from.pop());S.moves=o.m||{};S.pn=o.n||{};S.lab=o.l||{};return true}
+function renderPanels(p){
+ const box=document.getElementById('panels'),by={};p.cols.forEach(c=>['t','m'].forEach(r=>{const x=c[r];if(x&&/^(mic|ret):/.test(x.cl||''))by[x.pid]=x}));
+ const W=482.6,U=44.45,P=26,X0=(W-15*P)/2,R=10.6,f=n=>(+n).toFixed(2);let g=0,h='',pv=null;
+ S.rooms.forEach(r=>r.panels.forEach(pn=>{const gi=g++,lb=(pn.label||'').trim()||letter(gi),nm=+pn.lines||0,nr=(+pn.cue||0)*(pn.stereo?2:1),on=!!(pn.cont&&pv),mo=on?pv.mo+pv.nm:0,ro=on?pv.ro+pv.nc:0;pv={mo,ro,nm,nc:+pn.cue||0};if(!nm&&!nr)return;
+  const mk=(kind,n,gs0,plf,k,col)=>range(n).map(i=>{const x=by[kind+':'+gi+'#'+i];return {gs:x?x.gs:gs0,pl:x?x.pl:String(plf(i)),k,col}});
+  const rows=[];const add=items=>{for(let i=0;i<items.length;i+=16)rows.push({it:items.slice(i,i+16)})};
+  add(mk('mic',nm,lb,i=>mo+i+1,'f',1));{const rt=mk('ret',nr,lb+' RET',i=>pn.stereo?(ro+Math.floor(i/2)+1)+'LR'[i%2]:ro+i+1,'m',6),last=rows[rows.length-1];
+   if(last&&nr&&last.it.length+nr<=16){while(last.it.length+nr<16)last.it.push(null);last.it.push(...rt)}else add(rt)}
+  let o=`<rect x="0" y="0" width="${W}" height="${f(rows.length*U)}" rx="1.5" fill="var(--bay)" stroke="var(--bay-line)" stroke-width=".6"/>`;
+  rows.forEach((rw,ri)=>{const y=ri*U;[6.35,U-6.35].forEach(dy=>[7.5,W-7.5].forEach(x=>{o+=`<rect x="${f(x-5)}" y="${f(y+dy-3.2)}" width="10" height="6.4" rx="3.2" fill="var(--panel)" stroke="var(--bay-line)" stroke-width=".4"/>`}));
+   let i=0;while(i<rw.it.length){if(!rw.it[i]){i++;continue}let j=i+1;while(j<rw.it.length&&rw.it[j]&&rw.it[j].k===rw.it[i].k&&rw.it[j].gs===rw.it[i].gs)j++;const x=X0+i*P-P/2+.6,w=(j-i)*P-1.2;
+    o+=`<rect x="${f(x)}" y="${f(y+1.6)}" width="${f(w)}" height="5" fill="var(--strip)"/><rect x="${f(x)}" y="${f(y+1.6)}" width="${f(w)}" height=".9" fill="var(--c${rw.it[i].col})"/><text x="${f(x+w/2)}" y="${f(y+5.7)}" class="xg">${esc(String(rw.it[i].gs).toUpperCase())}</text>`;i=j}
+   for(let k=0;k<16;k++){const cx=X0+k*P,cy=y+28.4,it=rw.it[k],x=cx-P/2+.6;
+    o+=`<rect x="${f(x)}" y="${f(y+7.1)}" width="${P-1.2}" height="5.2" fill="var(--strip)"${it?'':' opacity=".25"'}/>`;
+    if(!it){o+=`<circle cx="${f(cx)}" cy="${f(cy)}" r="${R}" fill="none" stroke="var(--bay-line)" stroke-width=".5" stroke-dasharray="1.6 1.2"/>`;continue}
+    o+=`<text x="${f(cx)}" y="${f(y+11.3)}" class="xn">${esc(it.pl)}</text><rect x="${f(cx-11.6)}" y="${f(cy-13.2)}" width="23.2" height="26.4" rx="2.2" fill="#2a3237" stroke="var(--bay-line)" stroke-width=".4"/><circle cx="${f(cx-8.6)}" cy="${f(cy-10.4)}" r="1.2" fill="#6d777e"/><circle cx="${f(cx+8.6)}" cy="${f(cy+10.4)}" r="1.2" fill="#6d777e"/><circle cx="${f(cx)}" cy="${f(cy)}" r="${R-.8}" fill="#aab3b9" stroke="var(--c${it.col})" stroke-width=".9"/>`;
+    if(it.k==='f')o+=`<circle cx="${f(cx)}" cy="${f(cy)}" r="7.4" fill="#20272b"/><rect x="${f(cx-2.6)}" y="${f(cy-R+.4)}" width="5.2" height="3.4" rx=".8" fill="#6d777e"/>`+[[-3.2,-1.2],[3.2,-1.2],[0,3.6]].map(([dx,dy])=>`<circle cx="${f(cx+dx)}" cy="${f(cy+dy)}" r="1.15" fill="#0b0e10"/>`).join('');
+    else o+=`<circle cx="${f(cx)}" cy="${f(cy)}" r="7.8" fill="#0b0e10"/><rect x="${f(cx-1.1)}" y="${f(cy-8)}" width="2.2" height="2.4" fill="#aab3b9"/>`+[[-3.2,-1.2],[3.2,-1.2],[0,3.6]].map(([dx,dy])=>`<circle cx="${f(cx+dx)}" cy="${f(cy+dy)}" r="1.05" fill="#aab3b9"/>`).join('')}});
+  const what=[nm?nm+' mic '+(nm>1?'lines':'line'):'',nr?nr+' return'+(nr>1?'s':''):''].filter(Boolean).join(', ');
+  h+=`<div class="xp"><div class="xp-name">${esc(r.name||'Room')} · panel ${esc(lb)} <span>${rows.length}U · ${what}</span></div><div class="scroll"><svg class="xsvg" viewBox="0 0 ${W} ${f(rows.length*U)}" role="img" aria-label="${esc((r.name||'Room')+' panel '+lb+': '+what)}">${o}</svg></div></div>`}));
+ box.hidden=!h;box.innerHTML=h?`<h2>XLR panels</h2><p class="hint">Each panel on a 19 inch plate, 16 XLR per row. Mic lines are female, returns are male. Returns move up to the end of the last mic row when they all fit there.</p>`+h:'';
+}
+function renderPlan(){
+ const p=PLAN=build();
+ {const live=new Set();p.cols.forEach(c=>['t','m'].forEach(r=>{if(c[r])live.add(c[r].pid)}));[...SEL].forEach(k=>{if(!live.has(k))SEL.delete(k)})}
+ if(S.sel>=p.cols.length)S.sel=0;
+ const warns=p.checks.filter(c=>c.lvl==='warn').length;
+ const order={warn:0,info:1,ok:2};
+ document.getElementById('summary').innerHTML=`<div class="sum"><span><b>${p.nb}</b>${p.nb===1?'bay':'bays'}</span><span><b>${p.assigned}</b>of ${p.nb*BW()*2} points assigned</span><span><b>${warns}</b>to resolve</span></div>
+ <ul class="checks">${[...p.checks].sort((a,b)=>order[a.lvl]-order[b.lvl]).map(c=>`<li><span class="tag ${c.lvl}">${c.lvl==='warn'?'Check':c.lvl==='ok'?'OK':'Note'}</span><span>${esc(c.t)}</span></li>`).join('')}</ul>`;
+
+ const tmpl=range(BW()/8).map(()=>'repeat(8,minmax(0,1fr))').join(' minmax(2px,.3fr) ');
+ let h=(p.assigned?'':`<p class="nothing">Nothing is on the patchbay yet. Add mic lines, preamps, converters and outboard in the questions, and they appear here.</p>`)+`<div class="exp"><span class="hint">Drag a name or a label to move its whole unit or cluster to free points on the same row. Hold Shift while dragging to move a single label. Shift-click labels to select several, then drag one of them to move them together. Undo with Cmd-Z or Ctrl-Z.</span><button class="btn" type="button" data-c="undo"${UN.length?'':' disabled'}>Undo</button><button class="btn" type="button" data-c="redo"${RE.length?'':' disabled'}>Redo</button><button class="btn" type="button" data-c="resetlayout"${Object.keys(S.moves).length?'':' disabled'}>Reset layout</button><button class="btn" type="button" data-c="resetnorm"${Object.keys(S.pn).length?'':' disabled'}>Reset normalling</button><button class="btn" type="button" data-c="resetlab"${Object.keys(S.lab).length?'':' disabled'}>Reset labels</button></div><div class="legend">${p.blocks.filter(b=>b.w!=null).map(b=>`<span><i style="--c:var(--c${b.color})"></i>${esc(b.name)}</span>`).join('')}<span>Number between the jacks: plain is no normal, outlined is half, solid is full. Click a number to change it, or drag across numbers to paint. Double-click a name to rename it.</span></div>`;
+ for(let b=0;b<p.nb;b++){
+  const bw=BW(),cs=p.cols.slice(b*bw,b*bw+bw);
+  const grpRow=(r,row)=>{let o='',i=0;while(i<bw){const x=cs[i][r];if(!x){o+=`<div class="gfree" style="grid-row:${row};grid-column:${colTrack(i)}"></div>`;i++;continue}
+    let j=i+1;while(j<bw&&cs[j][r]&&cs[j][r].cl===x.cl&&(cs[j][r].gt||'')===(x.gt||''))j++;const gt=x.gt||x.cn||x.dev,gs=x.gs||x.l;
+    o+=`<div class="grp ${r}" style="grid-row:${row};grid-column:${colTrack(i)}/${colTrack(j-1)+1};--c:var(--c${x.c})" data-cl="${esc(x.cl)}" data-g="${b*bw+i}" data-r="${r}" data-full="${esc(gt)}" data-short="${esc(gs)}" data-k="${esc(x.cl+'~'+x.agt)}" data-auto="${esc(x.agt)}">${esc(gt)}</div>`;i=j}return o};
+  const strip=(x,r)=>x?`<span class="strip ${r}${p.moved.has(x.cl)||p.moved.has(x.pid)?' moved':''}${SEL.has(x.pid)?' sel':''}" data-cl="${esc(x.cl)}" data-pid="${esc(x.pid)}" data-cn="${esc(x.cn)}" data-l="${esc(x.l)}" data-auto="${esc(x.apl)}">${esc(x.pl!=null&&x.pl!==''?x.pl:'\u00b7')}</span>`:`<span class="strip ${r} empty"></span>`;
+  const jack=x=>x?`<span class="jack on" style="--c:var(--c${x.c})"></span>`:`<span class="jack"></span>`;
+  const NT={NN:'no normal',HN:'half normal',FN:'full normal'};
+  const cells=cs.map((c,i)=>{const g=b*bw+i,can=c.t&&c.m;
+   return `<button class="pt" style="grid-row:2;grid-column:${colTrack(i)}" data-c="pt" data-g="${g}" aria-pressed="${g===S.sel}" aria-label="Bay ${b+1} point ${i+1}: ${esc(c.t?c.t.l:'free')} over ${esc(c.m?c.m.l:'free')}${can?', '+NT[c.n]:''}">
+   ${strip(c.t,'t')}${jack(c.t)}<span class="nm ${c.n}${can?' can':''}${c.nset?' set':''}" data-g="${g}">${i+1}</span>${jack(c.m)}${strip(c.m,'m')}</button>`}).join('');
+  h+=`<div class="scroll"><div class="bay"><div class="bay-name">Bay ${b+1} · ${FMT()}${S.bays&&b>=S.bays?' <span class="over">over: you have '+S.bays+'</span>':''}</div><div class="grid" style="grid-template-columns:${tmpl}">${grpRow('t',1)}${cells}${grpRow('m',3)}</div></div></div>`;
+ }
+ const c=p.cols[S.sel],g=S.sel;
+ const side=(x,w)=>x?`${esc(x.l)} <span class="mono">· ${esc(x.dev)} ${x.io==='out'?'output':'input'} · ${esc(x.conn)}${x.bal?'':' · unbalanced'}</span>`:'Free';
+ h+=`<dl class="detail"><dt>Point</dt><dd class="mono">Bay ${Math.floor(g/BW())+1}, point ${g%BW()+1}</dd><dt>Top</dt><dd>${side(c.t,c.tw)}</dd><dt>Bottom</dt><dd>${side(c.m,c.mw)}</dd><dt>Normal</dt><dd>${c.n==='FN'?'Full-normal':c.n==='HN'?'Half-normal':'None'}</dd></dl><p class="note">Select any point on a bay to see what it carries. Drag a label to move its unit.</p>`;
+ document.getElementById('bays').innerHTML=h;
+ renderPanels(p);
+ fitGroups();
+ persist();
+
+
+}
+
+/* ---------- events ---------- */
+const form=document.getElementById('form');
+function onField(e){
+ const el=e.target,a=el.dataset.a;if(!a)return;let rer=false;
+ if(a==='room'){const r=S.rooms[+el.dataset.i];r.name=el.value;form.querySelectorAll('select[data-a="tie"] option').forEach(o=>{if(o.value===r.id)o.textContent=r.name||'Room'});mirrors()}
+ else if(a==='tie'){const t=S.rooms[+el.dataset.i].panels[+el.dataset.j].ties[+el.dataset.k],p=el.dataset.p;t[p]=p==='n'?clamp(el.value,0,96):el.value;mirrors()}
+ else if(a==='panel'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j],p=el.dataset.p;pn[p]=(p==='direct'||p==='stereo'||p==='cont')?el.checked:(p==='lines'||p==='cue'||p==='tie')?clamp(el.value,0,96):el.value;if(p==='label'){const h=document.getElementById('pn-'+el.dataset.i+'-'+el.dataset.j+'-h');if(h)h.textContent='XLR panel '+((pn.label||'').trim()||letter(gidx(+el.dataset.i,+el.dataset.j)))}
+ if(p==='cue'){const id='pn-'+el.dataset.i+'-'+el.dataset.j;document.getElementById(id+'-rg').classList.toggle('off',!pn.cue);['stereo','direct'].forEach(k=>{document.getElementById(id+'-'+k).disabled=!pn.cue})}}
+ else if(a==='gear'){const it=S[el.dataset.g][+el.dataset.i],p=el.dataset.p;if(p==='insCh'||p==='insGrp'||p==='insOut'){it[p]=el.checked}else if(p==='cont'){it.cont=el.checked;convNotes()}else if(p==='mixer'){it.mixer=el.checked;if(it.mixer&&it.sends==null){it.sends=4;it.groups=4;it.outs=2}rer=true}else if(p==='row'){it.row=el.value}else if(p==='name'||p==='label'){it[p]=el.value;if(el.dataset.g==='conv')convNotes();if(p==='name'&&el.dataset.g!=='conv'){const l=document.getElementById(el.dataset.g+'-'+el.dataset.i+'-label');if(l)l.placeholder=autoLabel(it.name)}}else{it[p]=clamp(el.value,p==='ch'?1:0,128);const g=el.dataset.g,t=document.getElementById('total-'+g);if(t)t.innerHTML=totalHTML(g);}}
+ else if(a==='mm'){const p=el.dataset.p;if(p==='on'){S.mm.on=el.checked;rer=true}else if(p==='inSt'||p==='outSt')S.mm[p]=el.checked;else if(p==='src')S.mm.src=el.value;else S.mm[p]=clamp(el.value,0,48)}
+ else if(a==='set'){const p=el.dataset.p;if(p==='console'||p==='fmt'){S[p]=el.value;rer=true;if(p==='fmt'){S.moves={};histClear()}}else if(p==='monBay'||p==='monOff')S[p]=el.checked;else S[p]=clamp(el.value,0,128)}
+ if(rer)renderForm();renderPlan();
+}
+document.getElementById('bays').addEventListener('change',e=>{const el=e.target;if(!el.classList.contains('nsel'))return;mark();S.norm[el.dataset.k]=el.value;const id=el.id;renderPlan();const n=document.getElementById(id);if(n)n.focus()});
+form.addEventListener('input',onField);form.addEventListener('change',onField);
+document.addEventListener('click',e=>{
+ if(justDragged)return;let refocus=null;
+ const el=e.target.closest('[data-c]');if(!el)return;const c=el.dataset.c;
+ if(c==='pt'){const st=e.target.closest('.strip[data-pid]');
+  if(st&&(e.shiftKey||e.metaKey||e.ctrlKey)){const pid=st.dataset.pid,row=st.classList.contains('t')?'t':'m',g=+el.dataset.g;
+   const ag=ANCH?PLAN.cols.findIndex(c=>c[ANCH.row]&&c[ANCH.row].pid===ANCH.pid):-1;
+   if(e.shiftKey&&ANCH&&ANCH.row===row&&ag>=0&&SEL.has(ANCH.pid)&&!SEL.has(pid)){for(let k=Math.min(ag,g);k<=Math.max(ag,g);k++){const x=PLAN.cols[k][row];if(x)SEL.add(x.pid)}}
+   else if(SEL.has(pid))SEL.delete(pid);else SEL.add(pid);
+   ANCH={pid,row};renderPlan();return}
+  if(SEL.size&&!(st&&SEL.has(st.dataset.pid))){SEL.clear();ANCH=null}
+  S.sel=+el.dataset.g;renderPlan();return}
+ if(c==='step')S.step=+el.dataset.i;
+ else if(c==='next')S.step=Math.min(STEPS.length-1,S.step+1);
+ else if(c==='back')S.step=Math.max(0,S.step-1);
+ else if(c==='roomcount'){if(+el.dataset.d>0&&S.rooms.length<8)S.rooms.push({id:uid('r'),name:'Room '+(S.rooms.length+1),panels:[{label:'',lines:4,cue:0}]});else if(+el.dataset.d<0&&S.rooms.length>0){const r=S.rooms[S.rooms.length-1];for(let j=r.panels.length-1;j>=0;j--)dropMoves(['mic','ret','tie'],gidx(S.rooms.length-1,j));S.rooms.pop();S.rooms.forEach(x=>x.panels.forEach(pn=>(pn.ties||[]).forEach(t=>{if(t.to===r.id)t.to='pb'})))}}
+ else if(c==='addpanel'){const i=+el.dataset.i,r=S.rooms[i];if(r.panels.length<8){insertMoves(['mic','ret','tie'],gidx(i,r.panels.length));r.panels.push({label:'',lines:8,cue:0})}}
+ else if(c==='addtie'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j];if(!pn.ties)pn.ties=[];if(pn.ties.length<6)pn.ties.push(Object.assign(newTie(),{n:4}))}
+ else if(c==='rmtie'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j],t=pn.ties.splice(+el.dataset.k,1)[0];Object.keys(S.moves).forEach(k=>{if(k===('tie:'+t.id)||k.startsWith('tie:'+t.id+'#'))delete S.moves[k]})}
+ else if(c==='rmpanel'){const i=+el.dataset.i,j=+el.dataset.j;dropMoves(['mic','ret','tie'],gidx(i,j));S.rooms[i].panels.splice(j,1)}
+ else if(c==='addgear'){const g=el.dataset.g;S[g].push(g==='tie'?{name:'Tie lines '+(S.tie.length+1),label:'TIE'+(S.tie.length?' '+String.fromCharCode(65+S.tie.length):''),n:8,row:'t'}:g==='pre'?{name:'',label:'',ch:2}:g==='conv'?{name:'Converter '+(S.conv.length+1),label:'',ad:8,da:8}:{name:'',label:'',i:2,o:2})}
+ else if(c==='rmgear'){S[el.dataset.g].splice(+el.dataset.i,1);dropMoves({pre:['prei','preo','mxs','mxg','mxo','mxic','mxig','mxio'],ob:['ob'],conv:['ad','da'],tie:['tie']}[el.dataset.g],+el.dataset.i)}
+ else if(c==='resetlayout'){mark();S.moves={}}
+ else if(c==='resetnorm'){mark();S.pn={}}
+ else if(c==='resetlab'){mark();S.lab={}}
+ else if(c==='undo')hist(UN,RE);
+ else if(c==='redo')hist(RE,UN);
+ if(['addgear','rmgear','addpanel','rmpanel','roomcount','rmtie'].includes(c))histClear();
+ renderForm();renderPlan();
+ if(refocus){const f=document.querySelector(refocus);if(f&&!f.disabled)f.focus()}
+});
+/* ---------- rename: double-click a group name or a point label ---------- */
+(function(){const bays=document.getElementById('bays');let E=null;
+ const close=save=>{if(!E)return;const e=E;E=null;const v=e.inp.value.replace(/\s+/g,' ').trim();e.inp.remove();if(!save)return;const cur=S.lab[e.k];
+  if(v===''||v===e.auto){if(cur==null)return;mark();delete S.lab[e.k]}else{if(cur===v)return;mark();S.lab[e.k]=v}renderPlan()};
+ const open=(cx,cy)=>{const hit=document.elementFromPoint(cx,cy);if(!hit||!hit.closest)return;const gp=hit.closest('#bays .grp[data-k]'),st=!gp&&hit.closest('#bays .strip[data-pid]'),el=gp||st;if(!el)return;close(true);
+  const r=el.getBoundingClientRect(),inp=document.createElement('input');inp.id='led';inp.type='text';inp.autocomplete='off';inp.spellcheck=false;inp.maxLength=gp?24:6;inp.setAttribute('aria-label',gp?'Group name':'Point label');
+  const cur=gp?el.dataset.full:(el.textContent==='\u00b7'?'':el.textContent);inp.value=cur;inp.placeholder=el.dataset.auto||'';
+  const w=Math.max(r.width,gp?110:64),x=Math.max(4,Math.min(innerWidth-w-4,r.left+r.width/2-w/2));inp.style.cssText='left:'+x+'px;top:'+(r.top+r.height/2-13)+'px;width:'+w+'px';
+  document.body.appendChild(inp);E={inp,k:gp?el.dataset.k:el.dataset.pid,auto:el.dataset.auto||''};inp.focus();inp.select();
+  inp.addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();close(true)}else if(ev.key==='Escape'){ev.preventDefault();close(false)}});
+  inp.addEventListener('blur',()=>close(true))};
+ let L=null;
+ bays.addEventListener('pointerdown',e=>{if(e.button>0||e.shiftKey||e.metaKey||e.ctrlKey||!e.target.closest('.grp[data-k],.strip[data-pid]')){L=null;return}
+  const t=Date.now();if(L&&t-L.t<450&&Math.abs(e.clientX-L.x)<6&&Math.abs(e.clientY-L.y)<6){const x=e.clientX,y=e.clientY;L=null;
+   const go=()=>{removeEventListener('pointerup',go);setTimeout(()=>open(x,y),40)};addEventListener('pointerup',go)}else L={t,x:e.clientX,y:e.clientY}},true);
+ addEventListener('scroll',e=>{if(E&&e.target!==E.inp)close(true)},true);addEventListener('resize',()=>close(true));
+})();
+/* ---------- normalling: click or paint the number between the jacks ---------- */
+(function(){const bays=document.getElementById('bays');let PT=null,NA=null;
+ const setN=(g,v)=>{const c=PLAN.cols[g];if(!c||!c.t||!c.m)return;const k=c.t.pid+'|'+c.m.pid;if(v===c.nsug)delete S.pn[k];else S.pn[k]=v};
+ const hush=()=>{justDragged=true;setTimeout(()=>{justDragged=false},80)};
+ bays.addEventListener('pointerdown',e=>{const el=e.target.closest('.nm.can');if(!el||e.button>0)return;e.preventDefault();e.stopPropagation();const ae=document.activeElement;if(ae&&ae!==document.body&&ae.blur)ae.blur();const g=+el.dataset.g;mark();hush();
+  if(e.shiftKey&&NA){for(let k=Math.min(NA.g,g);k<=Math.max(NA.g,g);k++)setN(k,NA.v);NA={g,v:NA.v};renderPlan();return}
+  const v={NN:'HN',HN:'FN',FN:'NN'}[PLAN.cols[g].n];setN(g,v);NA={g,v};PT={v,done:new Set([g])};renderPlan()},true);
+ window.addEventListener('pointermove',e=>{if(!PT)return;const hit=document.elementFromPoint(e.clientX,e.clientY),el=hit&&hit.closest?hit.closest('.nm.can'):null;if(!el)return;const g=+el.dataset.g;if(PT.done.has(g))return;PT.done.add(g);setN(g,PT.v);NA={g,v:PT.v};renderPlan()});
+ const up=()=>{if(PT){PT=null;hush()}};window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)})();
+
+/* ---------- hover help ---------- */
+(function(){const tip=document.getElementById('tip');let timer=null,cur=null;
+ const hide=()=>{clearTimeout(timer);timer=null;cur=null;tip.hidden=true};
+ const show=el=>{if(!el.isConnected||document.body.classList.contains('dragging'))return;tip.textContent=el.dataset.tip;tip.hidden=false;
+  const r=el.getBoundingClientRect(),t=tip.getBoundingClientRect(),vw=document.documentElement.clientWidth;
+  let x=r.left+r.width/2-t.width/2;x=Math.max(8,Math.min(x,vw-t.width-8));let y=r.top-t.height-6;if(y<8)y=r.bottom+6;
+  tip.style.left=x+'px';tip.style.top=y+'px'};
+ document.addEventListener('pointerover',e=>{if(e.pointerType!=='mouse')return;const el=e.target.closest&&e.target.closest('[data-tip]');if(el===cur)return;hide();if(!el)return;cur=el;timer=setTimeout(()=>show(el),450)});
+ document.addEventListener('pointerdown',hide,true);document.addEventListener('scroll',hide,true);
+ document.addEventListener('focusin',e=>{const el=e.target.closest&&e.target.closest('[data-tip]');if(el&&byKey){hide();cur=el;show(el)}});
+ let byKey=false;document.addEventListener('keydown',e=>{if(e.key==='Tab')byKey=true},true);document.addEventListener('pointerdown',()=>{byKey=false},true);
+ document.addEventListener('focusout',hide);
+})();
+
+/* ---------- save and open ---------- */
+const DEF=JSON.parse(JSON.stringify(S)),KEY='studio-patch-planner-project';
+function applyState(o){
+ if(!o||!['rooms','pre','ob','conv'].every(k=>Array.isArray(o[k])))throw new Error('not a project');
+ const n=Object.assign(JSON.parse(JSON.stringify(DEF)),JSON.parse(JSON.stringify(o)));
+ const oldTies=Array.isArray(n.tie)?n.tie:[];n.tie=[];
+ n.rooms=n.rooms.map(r=>Array.isArray(r.panels)&&r.panels.length?r:{name:r.name||'Room',panels:[{label:r.label||'',lines:+r.lines||0,cue:+r.cue||0,direct:!!r.direct,stereo:!!r.stereo}]});
+ oldTies.forEach(u=>{if(u&&u.n)n.rooms.push({name:u.name||'Tie lines',panels:[{label:'',lines:0,cue:0,tie:+u.n||0}]})});
+ n.rooms.forEach(r=>{if(!r.id)r.id=uid('r');r.panels.forEach(pn=>{if(pn.tie==null)pn.tie=Array.isArray(pn.ties)?pn.ties.reduce((a,t)=>a+(+(t&&t.n)||0),0):0;pn.tie=+pn.tie||0;delete pn.ties})});
+ {let g=0;n.rooms.forEach(r=>r.panels.forEach(pn=>{const lb=(pn.label||'').trim()||letter(g);g++;if(pn.tie>0){n.ob.push({name:'Tie lines '+lb,label:lb+' TIE',i:0,o:pn.tie});['moves','lab'].forEach(m=>Object.keys(n[m]||{}).forEach(k=>{if(/^tie:/.test(k))delete n[m][k]}))}pn.tie=0}))}
+ if(n.convSum){n.conv.forEach((u,k)=>{if(k>0)u.cont=true});n.convSum=false}
+ if(!n.mm||typeof n.mm!=='object')n.mm={on:false,ins:4,inSt:false,outs:2,outSt:true,src:'da'};
+ n.step=Math.min(STEPS.length-1,Math.max(0,parseInt(n.step,10)||0));n.sel=0;
+ n.norm={};['pn','moves','lab'].forEach(k=>{if(!n[k]||typeof n[k]!=='object')n[k]={}});
+ Object.keys(S).forEach(k=>delete S[k]);Object.assign(S,n);if(typeof histClear==='function')histClear();
+}
+const sig=o=>{const c=JSON.parse(JSON.stringify(o));delete c.step;delete c.sel;return JSON.stringify(c)};
+let LIVE=false,PREV=null;
+function persist(){if(!LIVE){if(sig(S)===sig(DEF))return;LIVE=true;const r=document.getElementById('proj-restore');if(r)r.hidden=true}
+ try{localStorage.setItem(KEY,JSON.stringify({saved:new Date().toISOString(),project:S}))}catch(e){}}
+function projectFile(){return JSON.stringify({app:'studio-patch-planner',version:1,saved:new Date().toISOString(),project:S},null,1)}
+try{const raw=localStorage.getItem(KEY);if(raw){const o=JSON.parse(raw),pr=o.project||o;if(pr&&Array.isArray(pr.rooms)&&sig(Object.assign(JSON.parse(JSON.stringify(DEF)),pr))!==sig(DEF))PREV={saved:o.saved||null,project:pr}}}catch(e){}
+renderForm();renderPlan();
+(function(){
+ const nm=document.getElementById('proj-name'),msg=document.getElementById('proj-msg'),file=document.getElementById('proj-file'),bs=document.getElementById('proj-save'),bn=document.getElementById('proj-new');
+ const say=t=>{msg.textContent=t};
+ nm.value=S.name||'';
+ if(PREV){const r=document.getElementById('proj-restore');let when='';try{if(PREV.saved)when=', edited '+new Date(PREV.saved).toLocaleString([], {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}catch(e){}
+  document.getElementById('proj-restore-info').textContent='('+((PREV.project.name||'').trim()||'Untitled studio')+when+')';r.hidden=false;
+  document.getElementById('proj-restore-btn').addEventListener('click',()=>{try{applyState(PREV.project);LIVE=true;r.hidden=true;nm.value=S.name||'';renderForm();renderPlan();say('Restored your last session.')}catch(e){say('The last session could not be restored.')}})}
+ const DEMO={"name":"Demo studio","rooms":[{"name":"Live Room 1","panels":[{"label":"","lines":16,"cue":4,"stereo":true},{"label":"","lines":8,"cue":0,"cont":true}]},{"name":"Live Room 2","panels":[{"label":"","lines":8,"cue":2,"stereo":true}]},{"name":"Vocal Booth","panels":[{"label":"","lines":4,"cue":1,"stereo":true}]},{"name":"Amp Room","panels":[{"label":"","lines":4,"cue":0}]}],"pre":[{"name":"Studer 961","label":"","ch":12,"mixer":true,"sends":2,"stSends":1,"groups":4,"outs":2,"insCh":true,"insGrp":false,"insOut":true},{"name":"Neve 1073","label":"","ch":8},{"name":"API 512c","label":"","ch":8},{"name":"Millennia HV-3D","label":"","ch":8}],"conv":[{"name":"Converter 1","label":"","ad":32,"da":32},{"name":"Converter 2","label":"","ad":8,"da":8,"cont":true}],"ob":[{"name":"Gyraf G3","label":"G3","i":2,"o":2},{"name":"UREI 1176","label":"1176","i":1,"o":1},{"name":"UREI 1176 B","label":"76B","i":1,"o":1},{"name":"Teletronix LA-2A","label":"LA2","i":1,"o":1},{"name":"Empirical Labs Distressor","label":"EL8","i":2,"o":2},{"name":"Pultec EQP-1A","label":"EQP","i":2,"o":2},{"name":"Eventide H3000","label":"H3K","i":2,"o":2},{"name":"Lexicon 480L","label":"480L","i":2,"o":4},{"name":"Boss DE-200","label":"DE2","i":1,"o":1},{"name":"Yamaha SPX90","label":"SPX","i":1,"o":2},{"name":"Roland RE-201","label":"RE2","i":1,"o":1}],"tie":[],"mm":{"on":true,"ins":8,"inSt":true,"outs":4,"outSt":true,"src":"da"},"monBay":true,"monOff":false,"monPair":0,"spare":10,"bays":0,"fmt":"bantam"};
+ document.getElementById('proj-demo').addEventListener('click',()=>{try{applyState(DEMO);S.step=0;LIVE=true;const r=document.getElementById('proj-restore');if(r)r.hidden=true;nm.value=S.name||'';renderForm();renderPlan();say('Demo studio loaded: 5 bays, 4 rooms. Press New to start over.')}catch(e){say('The demo could not be loaded.')}});
+ nm.addEventListener('input',()=>{S.name=nm.value;persist()});
+ document.getElementById('proj-open').addEventListener('click',()=>file.click());
+ file.addEventListener('change',()=>{const f=file.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const o=JSON.parse(r.result);applyState(o.project||o);nm.value=S.name||'';renderForm();renderPlan();say('Opened '+f.name+'.')}catch(e){say('That file is not a Studio Patch Planner project.')}file.value=''};
+  r.onerror=()=>say('The file could not be read.');r.readAsText(f)});
+ let armed=0;
+ bn.addEventListener('click',()=>{if(Date.now()-armed<4000){armed=0;bn.textContent='New';applyState(DEF);LIVE=true;nm.value='';renderForm();renderPlan();say('Started a new project.')}
+  else{armed=Date.now();bn.textContent='Click again to clear';setTimeout(()=>{if(armed){armed=0;bn.textContent='New'}},4000)}});
+ (async()=>{const dl=await getSaver();
+  bs.addEventListener('click',async()=>{const base=(S.name||'studio').trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').toLowerCase()||'studio';
+   bs.disabled=true;if(dl.prompt)say('Confirm the save in the prompt.');
+   try{await dl.save({filename:base+'.patchplan.json',data:projectFile()});say('Saved '+base+'.patchplan.json. Use Open file to load it again.')}
+   catch(err){const c=err&&err.code;say(c==='declined'?'Save cancelled.':c==='rate_limited'?'A save prompt is already open. Try again in a moment.':'The save did not go through here.')}
+   bs.disabled=false})})();
+})();
+
+/* ---------- drag to move ---------- */
+function reKey(prefixes,f){const one=pid=>{const m=/^([a-z]+):(\d+)([#~].*)?$/.exec(pid);if(!m||!prefixes.includes(m[1]))return pid;const n=f(+m[2]);return n==null||n<0?null:m[1]+':'+n+(m[3]||'')};
+ const mv={};Object.keys(S.moves).forEach(k=>{const n=one(k);if(n!=null)mv[n]=S.moves[k]});S.moves=mv;
+ const pn={};Object.keys(S.pn||{}).forEach(k=>{const [a,b]=k.split('|'),x=one(a),y=one(b);if(x!=null&&y!=null)pn[x+'|'+y]=S.pn[k]});S.pn=pn;
+ const lb={};Object.keys(S.lab||{}).forEach(k=>{const n=one(k);if(n!=null)lb[n]=S.lab[k]});S.lab=lb}
+function remapMoves(prefixes,map){reKey(prefixes,ix=>map[ix]!=null&&map[ix]>=0?map[ix]:ix)}
+function reorder(list,from,pos){const isP=list==='rooms'||list.startsWith('pn:'),arr=list==='rooms'?S.rooms:list.startsWith('pn:')?S.rooms[+list.slice(3)].panels:S[list],to=pos>from?pos-1:pos;
+ if(!arr||to===from||from<0||from>=arr.length||to<0||to>=arr.length)return false;
+ const flat=()=>isP?S.rooms.flatMap(r=>r.panels):arr.slice(),before=flat();arr.splice(to,0,arr.splice(from,1)[0]);const after=flat();
+ histClear();remapMoves(isP?['mic','ret','tie']:{pre:['prei','preo','mxs','mxg','mxo','mxic','mxig','mxio'],ob:['ob'],conv:['ad','da'],tie:['tie']}[list],before.map(o=>after.indexOf(o)));return true}
+(function(){let L=null;const form=document.getElementById('form');
+ const rowsOf=list=>[...form.querySelectorAll('[data-row="'+list+'"]')];
+ const clr=()=>form.querySelectorAll('.ins-b,.ins-a,.lift').forEach(x=>x.classList.remove('ins-b','ins-a','lift'));
+ form.addEventListener('pointerdown',e=>{const gr=e.target.closest('.grip');if(!gr||e.button>0)return;e.preventDefault();const ae=document.activeElement;if(ae&&ae!==document.body&&ae.blur)ae.blur();L={list:gr.dataset.list,i:+gr.dataset.i,y:e.clientY,on:false,pos:null}});
+ window.addEventListener('pointermove',e=>{if(!L)return;if(!L.on){if(Math.abs(e.clientY-L.y)<5)return;L.on=true;document.body.classList.add('dragging')}
+  const rows=rowsOf(L.list);clr();if(rows[L.i])rows[L.i].classList.add('lift');
+  let pos=rows.length;for(let k=0;k<rows.length;k++){const r=rows[k].getBoundingClientRect();if(e.clientY<r.top+r.height/2){pos=k;break}}
+  L.pos=pos;if(pos<rows.length)rows[pos].classList.add('ins-b');else if(rows.length)rows[rows.length-1].classList.add('ins-a')});
+ const up=()=>{if(!L)return;const l=L;L=null;if(!l.on)return;document.body.classList.remove('dragging');clr();if(l.pos!=null&&reorder(l.list,l.i,l.pos)){renderForm();renderPlan()}};
+ window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up)})();
+function insertMoves(prefixes,i){reKey(prefixes,ix=>ix>=i?ix+1:ix)}
+function dropMoves(prefixes,i){reKey(prefixes,ix=>ix===i?-1:ix>i?ix-1:ix)}
+(function(){
+ const bays=document.getElementById('bays'),ghost=document.getElementById('ghost');let D=null;
+ const cellsOf=cl=>{const a=[];PLAN.cols.forEach((c,g)=>['t','m'].forEach(r=>{if(c[r]&&c[r].cl===cl&&!(c[r].pid in S.moves))a.push([g,r])}));return a};
+ const stripEl=(g,r)=>bays.querySelector('.pt[data-g="'+g+'"] .strip.'+r);
+ const clear=()=>bays.querySelectorAll('.strip.ok,.strip.bad,.strip.lift').forEach(x=>x.classList.remove('ok','bad','lift'));
+ const end=()=>{document.body.classList.remove('dragging');ghost.hidden=true;clear()};
+ bays.addEventListener('pointerdown',e=>{let st=e.target.closest('.strip[data-cl]');const gp=!st&&e.target.closest('.grp[data-cl]');if(gp)st=stripEl(+gp.dataset.g,gp.dataset.r);if(!st||e.button>0)return;const multi=SEL.has(st.dataset.pid),one=!multi&&(e.shiftKey||(st.dataset.pid in S.moves)),sg=+st.parentElement.dataset.g;
+  const cells=multi?selCells():one?[[sg,st.classList.contains('t')?'t':'m']]:cellsOf(st.dataset.cl);if(!cells.length)return;
+  D={cl:st.dataset.cl,key:one?st.dataset.pid:st.dataset.cl,one,multi,cn:multi?cells.length+(cells.length>1?' selected labels':' selected label'):one?st.dataset.l+' (single label)':st.dataset.cn,cells,g0:(multi||one)?Math.min(...cells.map(x=>x[0])):clRef(st.dataset.cl,cells),grab:+st.parentElement.dataset.g,x:e.clientX,y:e.clientY,on:false,T:null,ok:false}});
+ window.addEventListener('pointermove',e=>{if(!D)return;
+  if(!D.on){if(Math.hypot(e.clientX-D.x,e.clientY-D.y)<6)return;D.on=true;document.body.classList.add('dragging');ghost.hidden=false;ghost.textContent=D.one||D.multi?D.cn:D.cn+' · '+D.cells.length+(D.cells.length>1?' points':' point')}
+  ghost.style.left=e.clientX+14+'px';ghost.style.top=e.clientY+14+'px';clear();
+  D.cells.forEach(([g,r])=>{const x=stripEl(g,r);if(x)x.classList.add('lift')});
+  const hit=document.elementFromPoint(e.clientX,e.clientY),cell=hit&&hit.closest?hit.closest('.pt'):null;
+  if(!cell){D.T=null;D.ok=false;return}
+  const T=D.g0+(+cell.dataset.g-D.grab);D.T=T;
+  D.ok=T!==D.g0&&D.cells.every(([g,r])=>{const d=PLAN.cols[T+g-D.g0];return d&&(!d[r]||(D.multi?SEL.has(d[r].pid):D.one?d[r].pid===D.key:d[r].cl===D.cl&&!(d[r].pid in S.moves)))});
+  D.cells.forEach(([g,r])=>{const x=stripEl(T+g-D.g0,r);if(x)x.classList.add(D.ok?'ok':'bad')})});
+ const up=()=>{if(!D)return;const d=D;D=null;if(!d.on)return;end();justDragged=true;setTimeout(()=>{justDragged=false},60);if(d.ok){mark();if(d.multi)d.cells.forEach(([g,r,pid])=>{S.moves[pid]=d.T+g-d.g0});else S.moves[d.key]=d.T;renderPlan()}};
+ const clRef=(cl,cells)=>{let a0=Infinity;PLAN.cols.forEach(c=>['t','m'].forEach(r=>{if(c[r]&&c[r].cl===cl)a0=Math.min(a0,c[r].ag)}));const [g,r]=cells[0];return g-(PLAN.cols[g][r].ag-a0)};
+ const selCells=()=>{const a=[];PLAN.cols.forEach((c,g)=>['t','m'].forEach(r=>{if(c[r]&&SEL.has(c[r].pid))a.push([g,r,c[r].pid])}));return a};
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&SEL.size){SEL.clear();ANCH=null;renderPlan();return}
+  const z=(e.metaKey||e.ctrlKey)&&!e.altKey&&(e.key==='z'||e.key==='Z'),y=(e.metaKey||e.ctrlKey)&&(e.key==='y'||e.key==='Y');if(!z&&!y)return;
+  const t=e.target;if(t&&(t.tagName==='INPUT'&&t.type!=='checkbox'||t.tagName==='TEXTAREA'||t.isContentEditable))return;
+  e.preventDefault();if((z&&e.shiftKey)||y?hist(RE,UN):hist(UN,RE))renderPlan()});
+ window.addEventListener('pointerup',up);window.addEventListener('pointercancel',up);
+})();
+
+/* ---------- bay overview PDF (A4 landscape, two bays per page) ---------- */
+function bayPDF(){
+ const p=PLAN,W=297,M=10,bw=BW(),ng=bw/8,gap=2,cw=(W-2*M-(ng-1)*gap)/bw;
+ const HEX=['#c2571a','#0d7f8c','#7a58c9','#2f7fd0','#b0428a','#4d8a2a','#8a7a12','#6b7780'];
+ const rgb=h=>[1,3,5].map(i=>(parseInt(h.substr(i,2),16)/255).toFixed(3)).join(' ');
+ const INK='0.08 0.11 0.14',GREY='0.55 0.58 0.61',PALE='0.80 0.82 0.84';
+ const cv=document.createElement('canvas').getContext('2d');
+ const tw=(t,z,b)=>{cv.font=(b?'bold ':'')+'100px Helvetica, Arial, sans-serif';return cv.measureText(t).width/100*z};
+ const es=t=>String(t).replace(/[^\x20-\x7e\xa0-\xff]/g,'?').replace(/[\\()]/g,'\\$&');
+ const n=v=>(+v).toFixed(2);
+ const pages=[];let o;
+ const text=(t,x,y,z,q={})=>o.push('BT /'+(q.b?'F2':'F1')+' '+n(z)+' Tf '+(q.c||INK)+' rg '+(q.rot?'0 -1 -1 0 ':'1 0 0 -1 ')+n(x)+' '+n(y)+' Tm ('+es(t)+') Tj ET');
+ const line=(x1,y1,x2,y2,c,w)=>o.push(c+' RG '+n(w)+' w '+n(x1)+' '+n(y1)+' m '+n(x2)+' '+n(y2)+' l S');
+ const circ=(x,y,r,c,w)=>{const k=r*0.5523;o.push(c+' RG '+n(w)+' w '+[x+r,y].map(n).join(' ')+' m '+[x+r,y+k,x+k,y+r,x,y+r].map(n).join(' ')+' c '+[x-k,y+r,x-r,y+k,x-r,y].map(n).join(' ')+' c '+[x-r,y-k,x-k,y-r,x,y-r].map(n).join(' ')+' c '+[x+k,y-r,x+r,y-k,x+r,y].map(n).join(' ')+' c S')};
+ const X=i=>M+i*cw+Math.floor(i/8)*gap;
+ const clip=(t,max,z,b)=>{if(tw(t,z,b)<=max)return t;let u=t;while(u.length>1&&tw(u+'...',z,b)>max)u=u.slice(0,-1);return u+'...'};
+ const np=Math.ceil(p.nb/2),date=new Date().toISOString().slice(0,10),SH=27,z0=Math.min(3,cw*0.45);
+ const strip=(x,i,y)=>{o.push(PALE+' RG 0.15 w '+n(X(i))+' '+n(y)+' '+n(cw)+' '+n(SH)+' re S');if(!x)return;let z=z0;while(z>1.3&&tw(x.l,z,true)>SH-2)z-=0.1;text(x.l,X(i)+cw/2+z*0.36,y+SH/2+tw(x.l,z,true)/2,z,{b:1,rot:1})};
+ for(let b=0;b<p.nb;b++){
+  if(b%2===0){o=[];pages.push(o);o.push('2.83465 0 0 -2.83465 0 595.28 cm');
+   text(S.name||'Untitled studio',M,12,4.4,{b:1});const r='Patchbay overview  \xb7  '+date+'  \xb7  Page '+pages.length+' of '+np;text(r,W-M-tw(r,2.6),12,2.6,{c:GREY});
+   line(M,14.5,W-M,14.5,PALE,0.2);
+   text('Number between the jacks: patchbay point.  Outlined number: half normal.  Solid number: full normal.',M,203,2.3,{c:GREY})}
+  const y0=24+(b%2)*84,cs=p.cols.slice(b*bw,b*bw+bw),GH=6.5,PH=5.5;
+  text('Bay '+(b+1)+'  \xb7  '+FMT().replace('\u00d7','\xd7'),M,y0+3.4,3.2,{b:1});
+  const box=(x,y,w,h)=>o.push(PALE+' RG 0.15 w '+n(x)+' '+n(y)+' '+n(w)+' '+n(h)+' re S');
+  const mid=(t,x,w,yb,z,q)=>{let zz=z;while(zz>1.2&&tw(t,zz,true)>w-0.6)zz-=0.1;text(t,x+w/2-tw(t,zz,true)/2,yb-(z-zz)*0.3,zz,Object.assign({b:1},q||{}))};
+  const grp=(r,y,edgeY)=>{let i=0;while(i<bw){const x=cs[i][r];if(!x){box(X(i),y,cw,GH);i++;continue}let j=i+1;while(j<bw&&cs[j][r]&&cs[j][r].cl===x.cl&&(cs[j][r].gt||'')===(x.gt||''))j++;
+    const x1=X(i),w=X(j-1)+cw-x1,full=String(x.gt||x.cn||x.dev).toUpperCase(),sh=String(x.gs||x.l).toUpperCase();box(x1,y,w,GH);line(x1,edgeY,x1+w,edgeY,rgb(HEX[x.c-1]),0.8);
+    mid(tw(full,2.6,true)<=w-1?full:sh,x1,w,y+GH/2+0.95,2.6);i=j}};
+  grp('t',y0+7,y0+7);
+  cs.forEach((c,k)=>{const cx=X(k)+cw/2,num=String(k+1),pz=Math.min(2.5,cw*0.5),nz=Math.min(1.9,cw*0.38);
+   box(X(k),y0+7+GH,cw,PH);if(c.t)mid(c.t.pl||'',X(k),cw,y0+7+GH+PH/2+pz*0.36,pz);
+   circ(cx,y0+22.6,1.1,c.t?rgb(HEX[c.t.c-1]):PALE,c.t?0.45:0.2);
+   const nw=Math.min(cw-0.6,tw(num,nz)+1.4);
+   if(c.n==='FN')o.push(INK+' rg '+n(cx-nw/2)+' '+n(y0+24.75)+' '+n(nw)+' 2.9 re f');
+   if(c.n==='HN')o.push(INK+' RG 0.2 w '+n(cx-nw/2)+' '+n(y0+24.75)+' '+n(nw)+' 2.9 re S');
+   text(num,cx-tw(num,nz)/2,y0+26.9,nz,{c:c.n==='FN'?'1 1 1':GREY});
+   circ(cx,y0+29.8,1.1,c.m?rgb(HEX[c.m.c-1]):PALE,c.m?0.45:0.2);
+   box(X(k),y0+32,cw,PH);if(c.m)mid(c.m.pl||'',X(k),cw,y0+32+PH/2+pz*0.36,pz)});
+  grp('m',y0+32+PH,y0+32+PH+GH);
+ }
+ const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Count '+pages.length+' /Kids ['+pages.map((_,k)=>(5+2*k)+' 0 R').join(' ')+'] >>',
+  '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'];
+ pages.forEach((pg,k)=>{const body=pg.join('\n');objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+(6+2*k)+' 0 R >>','<< /Length '+body.length+' >>\nstream\n'+body+'\nendstream')});
+ let out='%PDF-1.4\n%\xe2\xe3\xcf\xd3\n';const off=[];
+ objs.forEach((b,k)=>{off.push(out.length);out+=(k+1)+' 0 obj\n'+b+'\nendobj\n'});
+ const xr=out.length;out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n'+off.map(v=>String(v).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<< /Size '+(objs.length+1)+' /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF\n';
+ const u=new Uint8Array(out.length);for(let k=0;k<out.length;k++)u[k]=out.charCodeAt(k)&255;return u;
+}
+
+/* ---------- saving files: Claude's download prompt when present, else a normal browser download ---------- */
+async function getSaver(){let dl=null;try{dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null}catch(e){}
+ if(dl)return {prompt:true,save:r=>dl.save(r)};
+ const MT={json:'application/json',pdf:'application/pdf',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};
+ return {prompt:false,save:async({filename,data})=>{const ext=filename.split('.').pop().toLowerCase(),blob=data instanceof Blob?data:new Blob([data],{type:MT[ext]||'application/octet-stream'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=filename;a.rel='noopener';a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);return {status:'saved'}}}}
+/* ---------- spreadsheet ---------- */
+function planSheets(){
+ const p=PLAN,NN={FN:'Full normal',HN:'Half normal',NN:'None'};
+ const pts=[['Bay','Point','Section','Top label','Top device','Top connector','Normal','Bottom label','Bottom device','Bottom connector']];
+ p.cols.forEach((c,g)=>{pts.push([Math.floor(g/BW())+1,g%BW()+1,(c.t&&c.t.sec)||(c.m&&c.m.sec)||'Free',c.t?c.t.l:'',c.t?c.t.dev:'',c.t?c.t.conn:'',(c.t||c.m)?NN[c.n]:'',c.m?c.m.l:'',c.m?c.m.dev:'',c.m?c.m.conn:''])});
+
+ const checks=[['Status','Detail']];p.checks.forEach(c=>checks.push([c.lvl==='warn'?'Check':c.lvl==='ok'?'OK':'Note',c.t]));
+ return {'Bay points':pts,'Checks':checks};
+}
+(async()=>{
+ const btn=document.getElementById('dl'),msg=document.getElementById('dlmsg'),pb=document.getElementById('pdf');
+ const dl=await getSaver();
+ pb.addEventListener('click',async()=>{const base=(S.name||'studio').trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').toLowerCase()||'studio';
+  pb.disabled=true;msg.textContent=dl.prompt?'Confirm the download in the prompt.':'';
+  try{await dl.save({filename:base+'-patchbays.pdf',data:bayPDF()});msg.textContent='Saved '+base+'-patchbays.pdf.'}
+  catch(err){const c=err&&err.code;msg.textContent=c==='declined'?'Download cancelled.':c==='rate_limited'?'A download prompt is already open. Try again in a moment.':'The download did not go through here.'}
+  pb.disabled=false});
+ btn.addEventListener('click',async()=>{
+  if(typeof XLSX==='undefined'){msg.textContent='The spreadsheet library did not load. Reload the page and try again.';return}
+  const wb=XLSX.utils.book_new(),sh=planSheets();
+  Object.keys(sh).forEach(n=>{const ws=XLSX.utils.aoa_to_sheet(sh[n]);ws['!cols']=sh[n][0].map((_,i)=>({wch:Math.min(60,Math.max(...sh[n].map(r=>String(r[i]==null?'':r[i]).length))+2)}));XLSX.utils.book_append_sheet(wb,ws,n)});
+  btn.disabled=true;msg.textContent=dl.prompt?'Confirm the download in the prompt.':'';
+  try{await dl.save({filename:'studio-patch-plan.xlsx',data:XLSX.write(wb,{bookType:'xlsx',type:'array'})});msg.textContent='Saved studio-patch-plan.xlsx.'}
+  catch(err){const c=err&&err.code;msg.textContent=c==='declined'?'Download cancelled.':c==='rate_limited'?'A download prompt is already open. Try again in a moment.':'The download did not go through here.'}
+  btn.disabled=false;
+ });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>XLR Panel Mock-up</title>
+<style>
+:root{--bg:#e9edf0;--panel:#f7f9fa;--ink:#16202a;--muted:#5b6770;--line:#cfd6db;--plate:#1d2428;--plate-line:#39444b;--plate-ink:#e8edf0;--strip:#f3f1ea;--strip-ink:#16202a;--metal:#aab3b9;--metal-d:#6d777e;--hole:#0b0e10;--mic:#c2571a;--ret:#7a58c9;--body:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;--display:'Archivo','Inter',system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#11161a;--panel:#192026;--ink:#e8edf0;--muted:#9aa6ae;--line:#2c363d;--plate:#0c1012;--plate-line:#39444b}}
+:root[data-theme="dark"]{--bg:#11161a;--panel:#192026;--ink:#e8edf0;--muted:#9aa6ae;--line:#2c363d;--plate:#0c1012;--plate-line:#39444b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.5 var(--body)}
+main{max-width:1240px;margin:0 auto;padding:28px 16px 48px}
+h1{font:700 clamp(24px,4vw,34px)/1.1 var(--display);text-transform:uppercase;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 22px;max-width:62ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:18px}
+.scroll{overflow-x:auto;max-width:100%}
+svg{display:block;width:100%;min-width:760px;height:auto}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13.5px;color:var(--muted);margin-top:12px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--c)}
+h2{font:600 13px var(--display);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+ul{margin:0;padding-left:18px}
+li{margin:3px 0}
+</style>
+<main>
+<h1>XLR Panel Mock-up</h1>
+<p class="sub">Panel A with 32 mic lines and 8 returns, drawn to scale as a 19 inch, 3U plate with 16 connectors per row.</p>
+<div class="card">
+<div class="scroll"><svg id="p" viewBox="0 0 482.6 133.35" role="img" aria-label="3U XLR panel: two rows of 16 female XLR for mic lines 1 to 32, one row with 8 male XLR for returns 1 to 8 and 8 blank positions"></svg></div>
+<div class="legend"><span><i style="--c:var(--mic)"></i>Mic lines 1–32, female XLR</span><span><i style="--c:var(--ret)"></i>Returns 1–8, male XLR</span><span><i style="--c:var(--metal-d)"></i>8 blank positions</span></div>
+</div>
+<div class="card">
+<h2>What is drawn</h2>
+<ul>
+<li>19 inch wide, 3U high (482.6 × 133.4 mm), D-size cut-outs at 26 mm pitch, 16 per row.</li>
+<li>Rows 1 and 2: mic lines 1–16 and 17–32 on female XLR.</li>
+<li>Row 3: returns 1–8 on male XLR, then 8 blanked positions for later use.</li>
+<li>Two label lines over each row, the same idea as on the patchbay: group name, then the number.</li>
+</ul>
+</div>
+</main>
+<script>
+(function(){
+const NS='http://www.w3.org/2000/svg',svg=document.getElementById('p');
+const el=(n,a,t)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(t!=null)e.textContent=t;svg.appendChild(e);return e};
+const W=482.6,U=44.45,P=26,X0=(W-15*P)/2,R=10.6;
+const v=n=>'var(--'+n+')';
+el('rect',{x:0,y:0,width:W,height:3*U,rx:1.5,fill:v('plate'),stroke:v('plate-line'),'stroke-width':.6});
+// rack ear slots
+[0,1,2].forEach(u=>[6.35,U-6.35].forEach(dy=>[7.5,W-7.5].forEach(x=>el('rect',{x:x-5,y:u*U+dy-3.2,width:10,height:6.4,rx:3.2,fill:v('bg'),stroke:v('plate-line'),'stroke-width':.4}))));
+const txt=(s,x,y,z,o)=>el('text',Object.assign({x,y,'font-size':z,'text-anchor':'middle','font-family':'Archivo, Inter, system-ui, sans-serif','font-weight':600,fill:v('strip-ink')},o||{}),s);
+function group(row,i0,n,name,col){const x=X0+i0*P-P/2+.6,w=n*P-1.2,y=row*U+2.2;
+ el('rect',{x,y,width:w,height:4.6,fill:v('strip')});el('rect',{x,y,width:w,height:.9,fill:v(col)});
+ txt(name,x+w/2,y+3.9,3,{'letter-spacing':.3});}
+function cell(row,i,label){const x=X0+i*P-P/2+.6,y=row*U+7.3;el('rect',{x,y,width:P-1.2,height:4.6,fill:v('strip'),opacity:label==null?.25:1});if(label!=null)txt(label,x+(P-1.2)/2,y+3.7,3.4)}
+function conn(row,i,kind,col){const cx=X0+i*P,cy=row*U+27.6;
+ if(kind==='blank'){el('circle',{cx,cy,r:R,fill:'none',stroke:v('plate-line'),'stroke-width':.5,'stroke-dasharray':'1.6 1.2'});el('circle',{cx:cx-8.2,cy:cy-9.6,r:.9,fill:v('plate-line')});el('circle',{cx:cx+8.2,cy:cy+9.6,r:.9,fill:v('plate-line')});return}
+ el('rect',{x:cx-11.6,y:cy-13.2,width:23.2,height:26.4,rx:2.2,fill:'#2a3237',stroke:v('plate-line'),'stroke-width':.4});
+ el('circle',{cx:cx-8.6,cy:cy-10.4,r:1.2,fill:v('metal-d')});el('circle',{cx:cx+8.6,cy:cy+10.4,r:1.2,fill:v('metal-d')});
+ el('circle',{cx,cy,r:R-.8,fill:v('metal'),stroke:v(col),'stroke-width':.9});
+ if(kind==='f'){el('circle',{cx,cy,r:7.4,fill:'#20272b'});
+  el('rect',{x:cx-2.6,y:cy-R+.4,width:5.2,height:3.4,rx:.8,fill:v('metal-d')});
+  [[-3.2,-1.2],[3.2,-1.2],[0,3.6]].forEach(([dx,dy])=>el('circle',{cx:cx+dx,cy:cy+dy,r:1.15,fill:v('hole')}));}
+ else{el('circle',{cx,cy,r:7.8,fill:v('hole')});
+  el('rect',{x:cx-1.1,y:cy-8,width:2.2,height:2.4,fill:v('metal')});
+  [[-3.2,-1.2],[3.2,-1.2],[0,3.6]].forEach(([dx,dy])=>el('circle',{cx:cx+dx,cy:cy+dy,r:1.05,fill:v('metal')}));}}
+group(0,0,16,'A MIC','mic');group(1,0,16,'A MIC','mic');group(2,0,8,'A RET','ret');
+for(let i=0;i<16;i++){cell(0,i,i+1);conn(0,i,'f','mic');cell(1,i,i+17);conn(1,i,'f','mic');
+ if(i<8){cell(2,i,i+1);conn(2,i,'m','ret')}else{cell(2,i,null);conn(2,i,'blank')}}
+})();
+</script>
+
+</body>
+</html>
