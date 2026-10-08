@@ -122,6 +122,10 @@ input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabul
 .nkey .hint{grid-column:1/-1;margin:2px 0 0}
 .nchip{background:var(--bay);border-radius:3px;padding:3px 5px;display:inline-flex;container-type:normal}
 .nchip .nm{font-size:12px;line-height:16px;min-width:20px;opacity:1;padding:0 3px}
+.lblx{display:flex;flex-wrap:wrap;align-items:end;gap:8px 12px;margin-top:14px}
+.lblx .cap{flex:1 1 100%;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.lblx .f{width:140px}
+.lblx input{min-width:0;width:100%}
 .use{color:var(--muted);font-size:13.5px}
 .cq{font-weight:600;margin:0 0 6px}
 .rtb .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
@@ -243,8 +247,11 @@ td .u{color:var(--warn)}
       <div class="card" id="panels" hidden></div>
       <div class="card" id="export">
         <h2>Export</h2>
-        <p class="hint">The bay overview as a PDF on A4 landscape, two bays per page. Or an Excel workbook with every bay point and the checks.</p>
-        <div class="exp"><button class="btn primary" id="pdf" type="button">Save bay overview PDF</button><button class="btn" id="dl" type="button">Download spreadsheet</button><span class="hint" id="dlmsg" role="status"></span></div>
+        <p class="hint">The bay overview as a PDF on A4 landscape, two bays per page, an Excel workbook with every bay point, or label strips to print.</p>
+        <div class="exp"><button class="btn primary" id="pdf" type="button">Save bay overview PDF</button><button class="btn" id="dl" type="button">Download spreadsheet</button></div>
+        <div class="lblx"><span class="cap">Label strips, A4</span><label class="f"><span>Point width, mm</span><input type="number" id="lbl-w" min="5" max="30" step="0.005"></label><label class="f"><span>Strip height, mm</span><input type="number" id="lbl-h" min="5" max="20" step="0.1"></label><button class="btn" id="lbl" type="button">Save label strips PDF</button></div>
+        <p class="hint">Each strip prints in two halves with cut marks, after a test strip with a 100 mm ruler. Print at 100 %.</p>
+        <p class="hint" id="dlmsg" role="status"></p>
       </div>
     </section>
   </div>
@@ -538,6 +545,7 @@ function renderPlan(){
  h+=`<dl class="detail"><dt>Point</dt><dd class="mono">Bay ${Math.floor(g/BW())+1}, point ${g%BW()+1}</dd><dt>Top</dt><dd>${side(c.t,c.tw)}</dd><dt>Bottom</dt><dd>${side(c.m,c.mw)}</dd><dt>Normal</dt><dd>${c.n==='FN'?'Full-normal':c.n==='HN'?'Half-normal':'None'}</dd></dl><p class="note">Select any point on a bay to see what it carries.</p>`;
  document.getElementById('bays').innerHTML=h;
  renderPanels(p);
+ if(window.lblSync)window.lblSync();
  fitGroups();
  persist();
 
@@ -800,6 +808,51 @@ function bayPDF(){
  const u=new Uint8Array(out.length);for(let k=0;k<out.length;k++)u[k]=out.charCodeAt(k)&255;return u;
 }
 
+/* ---------- label strips PDF (A4 landscape, each strip in two halves) ---------- */
+function labelPDF(){
+ const p=PLAN,bw=BW(),half=bw/2,pw=+S.lw||(S.fmt==='jack'?17.25:8.625),sh=+S.lh||9.5,hw=half*pw,W=297,H=210,x0=(W-hw)/2;
+ const INK='0.08 0.11 0.14',GREY='0.55 0.58 0.61',PALE='0.78 0.80 0.82';
+ const HEX=['#c2571a','#0d7f8c','#7a58c9','#2f7fd0','#b0428a','#4d8a2a','#8a7a12','#6b7780'];
+ const rgb=h=>[1,3,5].map(i=>(parseInt(h.substr(i,2),16)/255).toFixed(3)).join(' ');
+ const cv=document.createElement('canvas').getContext('2d');
+ const tw=(t,z,b)=>{cv.font=(b?'bold ':'')+'100px Helvetica, Arial, sans-serif';return cv.measureText(t).width/100*z};
+ const es=t=>String(t).replace(/[^\x20-\x7e\xa0-\xff]/g,'?').replace(/[\\()]/g,'\\$&');
+ const n=v=>(+v).toFixed(2),pages=[];let o;
+ const text=(t,x,y,z,q={})=>o.push('BT /'+(q.b?'F2':'F1')+' '+n(z)+' Tf '+(q.c||INK)+' rg 1 0 0 -1 '+n(x)+' '+n(y)+' Tm ('+es(t)+') Tj ET');
+ const mid=(t,x,w,y,z,b)=>{let u=String(t);while(u.length>1&&tw(u,z,b)>w-0.6)u=u.slice(0,-1);text(u,x+w/2-tw(u,z,b)/2,y,z,{b})};
+ const line=(x1,y1,x2,y2,c,w)=>o.push(c+' RG '+n(w)+' w '+n(x1)+' '+n(y1)+' m '+n(x2)+' '+n(y2)+' l S');
+ const date=new Date().toISOString().slice(0,10),RP=sh+9,top=26,rows=Math.max(1,Math.floor((H-12-top)/RP));
+ const page=()=>{o=[];pages.push(o);o.push('2.83465 0 0 -2.83465 0 595.28 cm');text((S.name||'Untitled studio')+'  \xb7  label strips',10,12,4.2,{b:1});
+  const r='Print at 100 % (actual size), not "fit to page". Cut on the marks.  \xb7  Point width '+(+pw.toFixed(3))+' mm, height '+n(sh)+' mm  \xb7  '+date;text(r,W-10-tw(r,2.5),12,2.5,{c:GREY});line(10,14.5,W-10,14.5,PALE,0.2)};
+ const marks=(y)=>{[x0,x0+hw].forEach(x=>{line(x,y-4,x,y-0.8,INK,0.15);line(x,y+sh+0.8,x,y+sh+4,INK,0.15)});[y,y+sh].forEach(yy=>{line(x0-4,yy,x0-0.8,yy,INK,0.15);line(x0+hw+0.8,yy,x0+hw+4,yy,INK,0.15)})};
+ const gh=sh*0.45,zg=Math.min(2.5,gh*0.62),zn=Math.min(3,(sh-gh)*0.6);
+ const strip=(cells,y)=>{marks(y);o.push(PALE+' RG 0.15 w '+n(x0)+' '+n(y)+' '+n(hw)+' '+n(sh)+' re S');
+  let i=0;while(i<cells.length){const x=cells[i];if(!x){i++;continue}let j=i+1;while(j<cells.length&&cells[j]&&cells[j].cl===x.cl&&(cells[j].gt||'')===(x.gt||''))j++;
+   const gx=x0+i*pw,w=(j-i)*pw;line(gx+0.3,y+0.45,gx+w-0.3,y+0.45,rgb(HEX[(x.c||8)-1]),0.7);
+   const full=String(x.gt||x.cn||x.dev||'').toUpperCase(),sht=String(x.gs||x.l||'').toUpperCase();mid(tw(full,zg,1)<=w-0.6?full:sht,gx,w,y+gh/2+zg*0.36+0.3,zg,1);
+   if(i>0)line(gx,y,gx,y+sh,GREY,0.15);if(j<cells.length)line(gx+w,y,gx+w,y+sh,GREY,0.15);
+   for(let k=i;k<j;k++){const cx=x0+k*pw;if(k>i)line(cx,y+gh,cx,y+sh,PALE,0.12);mid(cells[k].pl||'',cx,pw,y+gh+(sh-gh)/2+zn*0.36,zn,1)}
+   line(gx,y+gh,gx+w,y+gh,PALE,0.12);i=j}};
+ let r=0;const next=()=>{if(r===0||r>=rows){page();r=0}const y=top+r*RP;r++;return y};
+ // test row: numbers and a 100 mm ruler
+ {page();let y=top;text('Test strip: check against a real bay and the 100 mm ruler before printing the rest.',x0+2,y-2.4,2.6,{c:GREY});marks(y);o.push(PALE+' RG 0.15 w '+n(x0)+' '+n(y)+' '+n(hw)+' '+n(sh)+' re S');
+  for(let k=0;k<half;k++){const cx=x0+k*pw;if(k)line(cx,y,cx,y+sh,PALE,0.12);mid(String(k+1),cx,pw,y+sh/2+zn*0.36,zn,1)}
+  const ry=y+sh+7;line(x0,ry,x0+100,ry,INK,0.25);for(let k=0;k<=10;k++)line(x0+k*10,ry,x0+k*10,ry-(k%5?1.5:2.5),INK,0.2);text('100 mm',x0+102,ry+0.9,2.6,{c:GREY});r=2}
+ for(let b=0;b<p.nb;b++){const cs=p.cols.slice(b*bw,b*bw+bw);['t','m'].forEach(rw=>{[0,1].forEach(h=>{const y=next();
+  text('Bay '+(b+1)+'  \xb7  '+(rw==='t'?'top row':'bottom row')+'  \xb7  points '+(h*half+1)+'-'+((h+1)*half)+(h?'  (right half)':'  (left half)'),x0+2,y-2.4,2.6,{c:GREY});
+  strip(cs.slice(h*half,(h+1)*half).map(c=>c[rw]),y)})})}
+ return pdfBytes(pages);
+}
+function pdfBytes(pages){
+ const objs=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Count '+pages.length+' /Kids ['+pages.map((_,k)=>(5+2*k)+' 0 R').join(' ')+'] >>',
+  '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'];
+ pages.forEach((pg,k)=>{const body=pg.join('\n');objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents '+(6+2*k)+' 0 R >>','<< /Length '+body.length+' >>\nstream\n'+body+'\nendstream')});
+ let out='%PDF-1.4\n%\xe2\xe3\xcf\xd3\n';const off=[];
+ objs.forEach((b,k)=>{off.push(out.length);out+=(k+1)+' 0 obj\n'+b+'\nendobj\n'});
+ const xr=out.length;out+='xref\n0 '+(objs.length+1)+'\n0000000000 65535 f \n'+off.map(v=>String(v).padStart(10,'0')+' 00000 n \n').join('')+'trailer\n<< /Size '+(objs.length+1)+' /Root 1 0 R >>\nstartxref\n'+xr+'\n%%EOF\n';
+ const u=new Uint8Array(out.length);for(let k=0;k<out.length;k++)u[k]=out.charCodeAt(k)&255;return u;
+}
+
 /* ---------- saving files: Claude's download prompt when present, else a normal browser download ---------- */
 async function getSaver(){let dl=null;try{dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null}catch(e){}
  if(dl)return {prompt:true,save:r=>dl.save(r)};
@@ -823,6 +876,16 @@ function planSheets(){
   try{await dl.save({filename:base+'-patchbays.pdf',data:bayPDF()});msg.textContent='Saved '+base+'-patchbays.pdf.'}
   catch(err){const c=err&&err.code;msg.textContent=c==='declined'?'Download cancelled.':c==='rate_limited'?'A download prompt is already open. Try again in a moment.':'The download did not go through here.'}
   pb.disabled=false});
+ const lb=document.getElementById('lbl'),lw=document.getElementById('lbl-w'),lh=document.getElementById('lbl-h');
+ const lsync=()=>{lw.value=+S.lw||(S.fmt==='jack'?17.25:8.625);lh.value=+S.lh||9.5};lsync();
+ window.lblSync=lsync;
+ lw.addEventListener('change',()=>{const v=parseFloat(lw.value);S.lw=v>0?Math.min(30,Math.max(5,v)):0;lsync();persist()});
+ lh.addEventListener('change',()=>{const v=parseFloat(lh.value);S.lh=v>0?Math.min(20,Math.max(5,v)):0;lsync();persist()});
+ lb.addEventListener('click',async()=>{const base=(S.name||'studio').trim().replace(/[^\w\- ]+/g,'').replace(/\s+/g,'-').toLowerCase()||'studio';
+  lb.disabled=true;msg.textContent=dl.prompt?'Confirm the download in the prompt.':'';
+  try{await dl.save({filename:base+'-label-strips.pdf',data:labelPDF()});msg.textContent='Saved '+base+'-label-strips.pdf.'}
+  catch(err){const c=err&&err.code;msg.textContent=c==='declined'?'Download cancelled.':c==='rate_limited'?'A download prompt is already open. Try again in a moment.':'The download did not go through here.'}
+  lb.disabled=false});
  btn.addEventListener('click',async()=>{
   if(typeof XLSX==='undefined'){msg.textContent='The spreadsheet library did not load. Reload the page and try again.';return}
   const wb=XLSX.utils.book_new(),sh=planSheets();
