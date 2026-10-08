@@ -114,6 +114,7 @@ input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabul
 .insx .chk{flex:0 0 auto}
 .insx .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .chk.warnline{color:var(--warn);font-weight:500}
+.use{color:var(--muted);font-size:13.5px}
 .rtb .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .rtb{display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .rtr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;padding:8px 10px;border:1px solid var(--line);border-radius:4px}
@@ -401,7 +402,9 @@ function mirrorText(i){const r=S.rooms[i],a=[];S.rooms.forEach(x=>{if(x===r)retu
 function mirrorHTML(i){const t=mirrorText(i);return `<p class="hint mir" id="mir-${i}"${t?'':' hidden'}>Also here: ${esc(t)}. Entered on the other room.</p>`}
 function mirrors(){S.rooms.forEach((r,i)=>{const e=document.getElementById('mir-'+i);if(e){const t=mirrorText(i);e.hidden=!t;e.textContent=t?'Also here: '+t+'. Entered on the other room.':''}})}
 function totalHTML(g){const items=S[g],pre=g==='pre',cv=g==='conv';if(g==='tie')return `<b>${items.length}</b> groups, <b>${items.reduce((a,it)=>a+it.n,0)}</b> lines`;const tin=items.reduce((a,it)=>a+(pre?it.ch:cv?it.ad:it.i),0),tout=items.reduce((a,it)=>a+(pre?it.ch:cv?it.da:it.o),0);
- return `<b>${items.length}</b> units, ${pre?`<b>${tin}</b> channels`:cv?`<b>${tin}</b> input, <b>${tout}</b> output`:`<b>${tin}</b> input, <b>${tout}</b> output`}`}
+ let use='';if(cv){const dir=S.rooms.reduce((a,r)=>a+r.panels.reduce((b,pn)=>b+(pn.direct?(+pn.cue||0):0),0),0),cin=S.mm&&S.mm.on&&S.mm.src==='da'?S.mm.ins*(S.mm.inSt?2:1):0,parts=[];
+  if(dir)parts.push(`<b>${dir}</b> go direct to room returns`);if(cin)parts.push(`<b>${cin}</b> feed the cue mixer`);if(parts.length)use=`<br><span class="use">Of the outputs, ${parts.join(' and ')} (set under Monitoring).</span>`}
+ return `<b>${items.length}</b> units, ${pre?`<b>${tin}</b> channels`:cv?`<b>${tin}</b> input, <b>${tout}</b> output`:`<b>${tin}</b> input, <b>${tout}</b> output`}`+use}
 function gearStep(g,q,hint){
  const items=S[g],pre=g==='pre',cv=g==='conv',ti=g==='tie';
  return `<p class="q">${q}</p>${hint?`<p class="hint">${hint}</p>`:''}<div class="rows">`+
