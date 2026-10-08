@@ -176,6 +176,12 @@ body.dragging .grp{cursor:grabbing}
 .strip.ok{background:var(--ok)}
 .strip.bad{background:var(--warn)}
 body.dragging,body.dragging .strip[data-cl]{cursor:grabbing}
+#cmenu{position:fixed;z-index:16;min-width:210px;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 24px rgba(0,0,0,.18);padding:4px;display:flex;flex-direction:column}
+#cmenu[hidden]{display:none}
+#cmenu .cm-h{font:600 11px var(--display);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:6px 10px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+#cmenu button{all:unset;box-sizing:border-box;font:400 14px var(--body);padding:7px 10px;border-radius:4px;cursor:pointer}
+#cmenu button:hover:not([disabled]),#cmenu button:focus-visible{background:var(--bg)}
+#cmenu button[disabled]{color:var(--muted);cursor:default;opacity:.7}
 #led{position:fixed;z-index:15;box-sizing:border-box;height:26px;padding:0 6px;font:600 13px var(--display);text-align:center;text-transform:uppercase;background:var(--panel);color:var(--ink);border:2px solid var(--accent);border-radius:3px;outline:0}
 .pn .pcont{grid-column:2/-1;margin:-2px 0 2px}
 .pn.solo .pcont{grid-column:1/-1}
@@ -500,7 +506,7 @@ function renderPlan(){
  <ul class="checks">${[...p.checks].sort((a,b)=>order[a.lvl]-order[b.lvl]).map(c=>`<li><span class="tag ${c.lvl}">${c.lvl==='warn'?'Check':c.lvl==='ok'?'OK':'Note'}</span><span>${esc(c.t)}</span></li>`).join('')}</ul>`;
 
  const tmpl=range(BW()/8).map(()=>'repeat(8,minmax(0,1fr))').join(' minmax(2px,.3fr) ');
- let h=(p.assigned?'':`<p class="nothing">Nothing is on the patchbay yet. Add mic lines, preamps, converters and outboard in the questions, and they appear here.</p>`)+`<div class="exp"><span class="hint">Drag a name or a label to move its whole unit or cluster to free points on the same row. Hold Shift while dragging to move a single label. Shift-click labels to select several, then drag one of them to move them together. Undo with Cmd-Z or Ctrl-Z.</span><button class="btn" type="button" data-c="undo"${UN.length?'':' disabled'}>Undo</button><button class="btn" type="button" data-c="redo"${RE.length?'':' disabled'}>Redo</button><button class="btn" type="button" data-c="resetlayout"${Object.keys(S.moves).length?'':' disabled'}>Reset layout</button><button class="btn" type="button" data-c="resetnorm"${Object.keys(S.pn).length?'':' disabled'}>Reset normalling</button><button class="btn" type="button" data-c="resetlab"${Object.keys(S.lab).length?'':' disabled'}>Reset labels</button></div><div class="legend">${p.blocks.filter(b=>b.w!=null).map(b=>`<span><i style="--c:var(--c${b.color})"></i>${esc(b.name)}</span>`).join('')}<span>Number between the jacks: plain is no normal, outlined is half, solid is full. Click a number to change it, or drag across numbers to paint. Double-click a name to rename it.</span></div>`;
+ let h=(p.assigned?'':`<p class="nothing">Nothing is on the patchbay yet. Add mic lines, preamps, converters and outboard in the questions, and they appear here.</p>`)+`<div class="exp"><span class="hint">Drag a name or a label to move its whole unit or cluster to free points on the same row. Hold Shift while dragging to move a single label. Shift-click labels to select several, then drag one of them to move them together. Undo with Cmd-Z or Ctrl-Z.</span><button class="btn" type="button" data-c="undo"${UN.length?'':' disabled'}>Undo</button><button class="btn" type="button" data-c="redo"${RE.length?'':' disabled'}>Redo</button><button class="btn" type="button" data-c="resetlayout"${Object.keys(S.moves).length?'':' disabled'}>Reset layout</button><button class="btn" type="button" data-c="resetnorm"${Object.keys(S.pn).length?'':' disabled'}>Reset normalling</button><button class="btn" type="button" data-c="resetlab"${Object.keys(S.lab).length?'':' disabled'}>Reset labels</button></div><div class="legend">${p.blocks.filter(b=>b.w!=null).map(b=>`<span><i style="--c:var(--c${b.color})"></i>${esc(b.name)}</span>`).join('')}<span>Number between the jacks: plain is no normal, outlined is half, solid is full. Click a number to change it, or drag across numbers to paint. Double-click a name to rename it. Right-click a section to reset it.</span></div>`;
  for(let b=0;b<p.nb;b++){
   const bw=BW(),cs=p.cols.slice(b*bw,b*bw+bw);
   const grpRow=(r,row)=>{let o='',i=0;while(i<bw){const x=cs[i][r];if(!x){o+=`<div class="gfree" style="grid-row:${row};grid-column:${colTrack(i)}"></div>`;i++;continue}
@@ -570,6 +576,23 @@ document.addEventListener('click',e=>{
  renderForm();renderPlan();
  if(refocus){const f=document.querySelector(refocus);if(f&&!f.disabled)f.focus()}
 });
+/* ---------- right-click menu on a section ---------- */
+(function(){const bays=document.getElementById('bays'),menu=document.createElement('div');menu.id='cmenu';menu.hidden=true;menu.setAttribute('role','menu');document.body.appendChild(menu);
+ const close=()=>{menu.hidden=true};
+ const info=cl=>{const pre=cl+'#',mv=Object.keys(S.moves).filter(k=>k===cl||k.startsWith(pre)),lb=Object.keys(S.lab).filter(k=>k.startsWith(cl+'~')||k.startsWith(pre)),pn=Object.keys(S.pn).filter(k=>k.split('|').some(x=>x.startsWith(pre)));
+  let taken=false,name='';PLAN.cols.forEach(c=>['t','m'].forEach(r=>{const x=c[r];if(!x||x.cl!==cl)return;if(!name)name=x.cn||x.gt||cl;const d=PLAN.cols[x.ag]&&PLAN.cols[x.ag][r];if(d&&d.cl!==cl)taken=true}));return {mv,lb,pn,taken:mv.length&&taken,name}};
+ bays.addEventListener('contextmenu',e=>{const el=e.target.closest('.grp[data-cl],.strip[data-cl]');if(!el){close();return}e.preventDefault();const cl=el.dataset.cl,f=info(cl);
+  const it=(act,txt,on)=>`<button type="button" role="menuitem" data-act="${act}"${on?'':' disabled'}>${txt}</button>`;
+  menu.innerHTML=`<div class="cm-h">${esc(f.name)}</div>`+it('pos',f.taken?'Original position is taken':'Reset to original position',f.mv.length&&!f.taken)+it('name','Reset name',f.lb.length)+it('norm','Reset normalling',f.pn.length);
+  menu.dataset.cl=cl;menu.hidden=false;const w=menu.offsetWidth,h=menu.offsetHeight;menu.style.left=Math.min(e.clientX,innerWidth-w-6)+'px';menu.style.top=Math.min(e.clientY,innerHeight-h-6)+'px';
+  const b=menu.querySelector('button:not([disabled])');if(b)b.focus()});
+ menu.addEventListener('click',e=>{const b=e.target.closest('button[data-act]');if(!b||b.disabled)return;const f=info(menu.dataset.cl);mark();
+  if(b.dataset.act==='pos')f.mv.forEach(k=>delete S.moves[k]);else if(b.dataset.act==='name')f.lb.forEach(k=>delete S.lab[k]);else f.pn.forEach(k=>delete S.pn[k]);
+  SEL.clear();close();renderPlan()});
+ document.addEventListener('pointerdown',e=>{if(!menu.hidden&&!menu.contains(e.target))close()},true);
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!menu.hidden){e.preventDefault();close()}});
+ addEventListener('scroll',()=>close(),true);addEventListener('resize',close);
+})();
 /* ---------- rename: double-click a group name or a point label ---------- */
 (function(){const bays=document.getElementById('bays');let E=null;
  const close=save=>{if(!E)return;const e=E;E=null;const v=e.inp.value.replace(/\s+/g,' ').trim();e.inp.remove();if(!save)return;const cur=S.lab[e.k];
