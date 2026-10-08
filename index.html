@@ -554,7 +554,7 @@ document.addEventListener('click',e=>{
  if(c==='step')S.step=+el.dataset.i;
  else if(c==='next')S.step=Math.min(STEPS.length-1,S.step+1);
  else if(c==='back')S.step=Math.max(0,S.step-1);
- else if(c==='roomcount'){if(+el.dataset.d>0&&S.rooms.length<8)S.rooms.push({id:uid('r'),name:'Room '+(S.rooms.length+1),panels:[{label:'',lines:4,cue:0}]});else if(+el.dataset.d<0&&S.rooms.length>0){const r=S.rooms[S.rooms.length-1];for(let j=r.panels.length-1;j>=0;j--)dropMoves(['mic','ret','tie'],gidx(S.rooms.length-1,j));S.rooms.pop();S.rooms.forEach(x=>x.panels.forEach(pn=>(pn.ties||[]).forEach(t=>{if(t.to===r.id)t.to='pb'})))}}
+ else if(c==='roomcount'){if(+el.dataset.d>0&&S.rooms.length<8)S.rooms.push({id:uid('r'),name:'Live Room '+(S.rooms.length+1),panels:[{label:'',lines:4,cue:0}]});else if(+el.dataset.d<0&&S.rooms.length>0){const r=S.rooms[S.rooms.length-1];for(let j=r.panels.length-1;j>=0;j--)dropMoves(['mic','ret','tie'],gidx(S.rooms.length-1,j));S.rooms.pop();S.rooms.forEach(x=>x.panels.forEach(pn=>(pn.ties||[]).forEach(t=>{if(t.to===r.id)t.to='pb'})))}}
  else if(c==='addpanel'){const i=+el.dataset.i,r=S.rooms[i];if(r.panels.length<8){insertMoves(['mic','ret','tie'],gidx(i,r.panels.length));r.panels.push({label:'',lines:8,cue:0})}}
  else if(c==='addtie'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j];if(!pn.ties)pn.ties=[];if(pn.ties.length<6)pn.ties.push(Object.assign(newTie(),{n:4}))}
  else if(c==='rmtie'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j],t=pn.ties.splice(+el.dataset.k,1)[0];Object.keys(S.moves).forEach(k=>{if(k===('tie:'+t.id)||k.startsWith('tie:'+t.id+'#'))delete S.moves[k]})}
