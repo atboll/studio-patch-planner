@@ -115,6 +115,7 @@ input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabul
 .insx .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .chk.warnline{color:var(--warn);font-weight:500}
 .use{color:var(--muted);font-size:13.5px}
+.cq{font-weight:600;margin:0 0 6px}
 .rtb .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .rtb{display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .rtr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;padding:8px 10px;border:1px solid var(--line);border-radius:4px}
@@ -426,8 +427,9 @@ function retBlock(){let g=0;const rows=[];
 function stepHTML(){
  const s=[0,5,1,3,2,4][S.step];
  if(s===0)return `<p class="q">Rooms and their XLR panels</p>
- <div class="count"><button class="btn" data-c="roomcount" data-d="-1" aria-label="One room fewer">−</button><output id="roomcount">${S.rooms.length}</output><button class="btn" data-c="roomcount" data-d="1" aria-label="One room more">+</button></div>
- <div class="rows">`+S.rooms.map((r,i)=>`<div class="row u" data-row="rooms">${tools('rooms',i,S.rooms.length)}<div class="rb"><label class="f grow"><span>Room name</span><input id="room-${i}-name" value="${esc(r.name)}" data-a="room" data-i="${i}" data-p="name"></label>
+ <p class="cq" id="roomq">How many live rooms and booths besides the control room?</p>
+ <div class="count" role="group" aria-labelledby="roomq"><button class="btn" data-c="roomcount" data-d="-1" aria-label="One room fewer">−</button><output id="roomcount">${S.rooms.length}</output><button class="btn" data-c="roomcount" data-d="1" aria-label="One room more">+</button></div>
+ <div class="rows">`+S.rooms.map((r,i)=>`<div class="row u" data-row="rooms">${tools('rooms',i,S.rooms.length)}<div class="rb"><label class="f grow"><span>Room</span><input id="room-${i}-name" value="${esc(r.name)}" data-a="room" data-i="${i}" data-p="name"></label>
  ${r.panels.map((pn,j)=>{const id=`pn-${i}-${j}`,at=`data-a="panel" data-i="${i}" data-j="${j}"`;return `<div class="pw" data-row="pn:${i}"><div class="pnh" id="${id}-h">XLR panel ${esc((pn.label||'').trim()||letter(gidx(i,j)))}</div><div class="pn"><span class="grip" data-list="pn:${i}" data-i="${j}" data-tip="Drag to reorder"></span>
   <label class="f" data-tip="XLR Panel Name"><span>Label</span><input id="${id}-label" maxlength="6" value="${esc(pn.label||'')}" placeholder="${letter(gidx(i,j))}" ${at} data-p="label"></label>
   <label class="f"><span>Mic lines</span><input type="number" min="0" max="96" id="${id}-lines" value="${pn.lines}" ${at} data-p="lines"></label>
