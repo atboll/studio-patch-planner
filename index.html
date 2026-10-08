@@ -119,6 +119,7 @@ input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabul
 .rtb{display:flex;flex-direction:column;gap:8px;align-items:stretch}
 .rtr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;padding:8px 10px;border:1px solid var(--line);border-radius:4px}
 .rtn{font-weight:600;flex:1 1 180px}
+.rtf{flex:1 1 200px;max-width:260px}
 .rtc{color:var(--muted);font-variant-numeric:tabular-nums;min-width:70px}
 .btn.addx{background:var(--warn-bg);color:var(--warn);border-color:var(--warn);font-weight:600}
 .btn.addx:hover{filter:brightness(.96)}
@@ -261,6 +262,7 @@ const autoLabel=n=>{const w=String(n||'').trim().split(/\s+/).filter(Boolean),cl
 const lab=it=>(it.label||'').trim()||autoLabel(it.name);
 const devName=it=>(it.name||'').trim()||lab(it);
 
+const feedOf=pn=>{const f=pn.feed||(pn.direct?'da':'');if(f==='da')return 'da';if(f==='patch')return 'patch';return S.mm&&S.mm.on?'cue':'patch'};
 function build(){
  const P=(l,dev,conn,io,bal=true)=>({l,dev,conn,io,bal});
  const G=(arr,gt,gs,plf)=>{let n=0;arr.forEach(x=>{if(x){x.gt=gt;x.gs=gs;x.pl=String(plf(n++))}});return arr},LRn=(st,i)=>st?(Math.floor(i/2)+1)+'LR'[i%2]:i+1,chS=(n,i)=>n===2?'LR'[i]:String(i+1);
@@ -268,7 +270,7 @@ function build(){
  const PX=[];S.rooms.forEach(r=>r.panels.forEach(pn=>{const g=PX.length,lb=(pn.label||'').trim()||letter(g);const pv=PX[g-1],on=!!(pn.cont&&pv);PX.push({r,pn,g,lb,dev:r.name+' panel '+lb,mo:on?pv.mo+(+pv.pn.lines||0):0,ro:on?pv.ro+(pv.pn.stereo?Math.ceil((+pv.pn.cue||0)/2):(+pv.pn.cue||0)):0})}));
  const micLines=PX.flatMap(x=>K('mic:'+x.g,x.r.name+' '+x.lb+' mic lines',G(range(x.pn.lines).map(i=>P(x.lb+' '+(x.mo+i+1),x.dev,'XLR-F','out')),x.r.name+' '+x.lb,x.lb,i=>x.mo+i+1)));
  const mkCue=x=>K('ret:'+x.g,x.r.name+' '+x.lb+' returns',G(range(+x.pn.cue||0).map(i=>P(x.lb+' RET '+(x.pn.stereo?(x.ro+Math.floor(i/2)+1)+'LR'[i%2]:x.ro+i+1),x.dev,'XLR-M','in')),x.r.name+' '+x.lb+' returns',x.lb+' RET',i=>x.pn.stereo?(x.ro+Math.floor(i/2)+1)+'LR'[i%2]:x.ro+i+1));
- const cueDirect=PX.filter(x=>x.pn.direct).flatMap(mkCue),cueLines=PX.filter(x=>!x.pn.direct).flatMap(mkCue);
+ const cueDirect=PX.filter(x=>feedOf(x.pn)==='da').flatMap(mkCue),cueLines=PX.filter(x=>feedOf(x.pn)==='cue').flatMap(mkCue),patchLines=PX.filter(x=>feedOf(x.pn)==='patch').flatMap(mkCue);
  const preIn=S.pre.flatMap((u,ui)=>K('prei:'+ui,devName(u)+' inputs',G(range(u.ch).map(i=>P(lab(u)+(u.ch>1?' '+(i+1):''),devName(u),'XLR-M','in')),devName(u)+' in',lab(u),i=>i+1)));
  const mxO=(u,n,tag)=>u.mixer?range(n||0).map(i=>P(lab(u)+' '+tag+(i+1),devName(u),'Line','out')):[];
  const preOut=S.pre.flatMap((u,ui)=>K('preo:'+ui,devName(u)+' outputs',G(range(u.ch).map(i=>P(lab(u)+(u.ch>1?' '+(i+1):''),devName(u),'XLR-F','out')),devName(u)+' out',lab(u),i=>i+1)));
@@ -325,7 +327,7 @@ function build(){
  B('Converter out / monitor, room returns',4,'HN',daTop,daBot);
  if(mmPend.length)B('Cue mixer in',6,'NN',[],mmPend.slice());
  if(MM)B('Cue mixer out / room returns',6,'HN',mmOut,cueLines);
- else if(cueLines.length)B('Room returns',6,'NN',[],cueLines);
+ if(patchLines.length)B('Room returns, patch only',6,'NN',[],patchLines);
  const tieTop=[],TIES=[];
  PX.forEach(x=>{const n=+x.pn.tie||0;if(!n)return;TIES.push({from:x.r.name,panel:x.lb,lb:x.lb+' TIE',n,to:'Patchbay',bay:true});tieTop.push(...K('tie:'+x.g,x.r.name+' '+x.lb+' tie lines',G(range(n).map(i=>P(x.lb+' TIE '+(i+1),x.dev,'Line','out')),x.r.name+' '+x.lb+' tie',x.lb+' TIE',i=>i+1),1))});
  B('Tie lines',8,'NN',tieTop,[]);
@@ -376,7 +378,8 @@ function build(){
   if(MM.src==='sends'&&left)C('warn',`${left} cue mixer ${left>1?'inputs have':'input has'} no free aux send to sit under. Tick a mixer in Preamps or raise its aux sends.`);
   if(cueLines.length>mmOut.length)C('info',`${cueLines.length-mmOut.length} room return channels have no cue mixer output above them.`)}
  if(cueDirect.length)C('info',`Direct room returns are fed from ${span(cueSrc[mixIn.length],cueSrc[cueDst.length-1])}.`);
- if(cueLines.length&&!MM)C('info',`${cueLines.length} room returns sit in their own section with no normal. Nothing feeds them until you patch.`);
+ if(patchLines.length)C('info',`${patchLines.length} room ${patchLines.length>1?'returns are':'return is'} patch only: on the bay with no normal, so nothing feeds ${patchLines.length>1?'them':'it'} until you patch.`);
+ if(!MM)PX.filter(x=>x.pn.feed==='cue'&&+x.pn.cue).forEach(x=>C('warn',`${x.r.name} XLR panel ${x.lb} is set to be fed from the cue mixer, but the cue mixer is off. Its returns are patch only for now.`));
  if(insTop.length)C('info',`${insTop.length} mixer inserts share a section with the outboard, each with its send above its return.`);
  S.pre.filter(u=>u.mixer).forEach(u=>C('info',`${devName(u)} is a mixer: its ${u.sends||0} mono aux sends, ${u.stSends||0} stereo aux sends, ${u.groups||0} group outs and ${u.outs||0} outputs start from the far end of the bay, finishing on point ${BW()}, and are not normalled unless you set it on the bay.`));
  if(con&&preOut.length>S.conCh)C('warn',`${preOut.length} preamp channels but ${S.conCh} console line inputs.`);
@@ -402,7 +405,7 @@ function mirrorText(i){const r=S.rooms[i],a=[];S.rooms.forEach(x=>{if(x===r)retu
 function mirrorHTML(i){const t=mirrorText(i);return `<p class="hint mir" id="mir-${i}"${t?'':' hidden'}>Also here: ${esc(t)}. Entered on the other room.</p>`}
 function mirrors(){S.rooms.forEach((r,i)=>{const e=document.getElementById('mir-'+i);if(e){const t=mirrorText(i);e.hidden=!t;e.textContent=t?'Also here: '+t+'. Entered on the other room.':''}})}
 function totalHTML(g){const items=S[g],pre=g==='pre',cv=g==='conv';if(g==='tie')return `<b>${items.length}</b> groups, <b>${items.reduce((a,it)=>a+it.n,0)}</b> lines`;const tin=items.reduce((a,it)=>a+(pre?it.ch:cv?it.ad:it.i),0),tout=items.reduce((a,it)=>a+(pre?it.ch:cv?it.da:it.o),0);
- let use='';if(cv){const dir=S.rooms.reduce((a,r)=>a+r.panels.reduce((b,pn)=>b+(pn.direct?(+pn.cue||0):0),0),0),cin=S.mm&&S.mm.on&&S.mm.src==='da'?S.mm.ins*(S.mm.inSt?2:1):0,parts=[];
+ let use='';if(cv){const dir=S.rooms.reduce((a,r)=>a+r.panels.reduce((b,pn)=>b+(feedOf(pn)==='da'?(+pn.cue||0):0),0),0),cin=S.mm&&S.mm.on&&S.mm.src==='da'?S.mm.ins*(S.mm.inSt?2:1):0,parts=[];
   if(dir)parts.push(`<b>${dir}</b> go direct to room returns`);if(cin)parts.push(`<b>${cin}</b> feed the cue mixer`);if(parts.length)use=`<br><span class="use">Of the outputs, ${parts.join(' and ')} (set under Monitoring).</span>`}
  return `<b>${items.length}</b> units, ${pre?`<b>${tin}</b> channels`:cv?`<b>${tin}</b> input, <b>${tout}</b> output`:`<b>${tin}</b> input, <b>${tout}</b> output`}`+use}
 function gearStep(g,q,hint){
@@ -418,7 +421,7 @@ function gearStep(g,q,hint){
 }
 function retBlock(){let g=0;const rows=[];
  S.rooms.forEach((r,i)=>r.panels.forEach((pn,j)=>{const lb=(pn.label||'').trim()||letter(g++),n=+pn.cue||0;if(!n)return;const id=`rt-${i}-${j}`,at=`data-a="panel" data-i="${i}" data-j="${j}"`;
-  rows.push(`<div class="rtr"><span class="rtn">${esc(r.name||'Room')} · XLR panel ${esc(lb)}</span><span class="rtc">${n} ${n>1?'returns':'return'}</span><label class="chk"><input type="checkbox" id="${id}-stereo"${pn.stereo?' checked':''} ${at} data-p="stereo"><span>Stereo pairs</span></label><label class="chk"><input type="checkbox" id="${id}-direct"${pn.direct?' checked':''} ${at} data-p="direct"><span>Direct from converter</span></label></div>`)}));
+  rows.push(`<div class="rtr"><span class="rtn">${esc(r.name||'Room')} · XLR panel ${esc(lb)}</span><span class="rtc">${n} ${n>1?'returns':'return'}</span><label class="chk"><input type="checkbox" id="${id}-stereo"${pn.stereo?' checked':''} ${at} data-p="stereo"><span>Stereo pairs</span></label><label class="f rtf"><span>Fed from</span><select id="${id}-feed" ${at} data-p="feed">${[['cue','Cue mixer'],['da','Converter outputs'],['patch','Patch only']].map(([v,t])=>`<option value="${v}"${feedOf(pn)===v?' selected':''}${v==='cue'&&!(S.mm&&S.mm.on)?' disabled':''}>${t}${v==='cue'&&!(S.mm&&S.mm.on)?' (cue mixer is off)':''}</option>`).join('')}</select></label></div>`)}));
  return `<div class="row rtb"><span class="cap">Room returns</span>${rows.length?rows.join(''):'<p class="hint">No XLR panel has returns yet. Add them under Rooms.</p>'}</div>`}
 function stepHTML(){
  const s=[0,5,1,3,2,4][S.step];
@@ -526,7 +529,8 @@ function onField(e){
  const el=e.target,a=el.dataset.a;if(!a)return;let rer=false;
  if(a==='room'){const r=S.rooms[+el.dataset.i];r.name=el.value;form.querySelectorAll('select[data-a="tie"] option').forEach(o=>{if(o.value===r.id)o.textContent=r.name||'Room'});mirrors()}
  else if(a==='tie'){const t=S.rooms[+el.dataset.i].panels[+el.dataset.j].ties[+el.dataset.k],p=el.dataset.p;t[p]=p==='n'?clamp(el.value,0,96):el.value;mirrors()}
- else if(a==='panel'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j],p=el.dataset.p;pn[p]=(p==='direct'||p==='stereo'||p==='cont')?el.checked:(p==='lines'||p==='cue')?clamp(el.value,0,p==='cue'?48:96):el.value;if(p==='label'){const h=document.getElementById('pn-'+el.dataset.i+'-'+el.dataset.j+'-h');if(h)h.textContent='XLR panel '+((pn.label||'').trim()||letter(gidx(+el.dataset.i,+el.dataset.j)))}}
+ else if(a==='panel'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j],p=el.dataset.p;pn[p]=(p==='direct'||p==='stereo'||p==='cont')?el.checked:(p==='lines'||p==='cue')?clamp(el.value,0,p==='cue'?48:96):el.value;if(p==='feed')delete pn.direct;
+ if(p==='label'){const h=document.getElementById('pn-'+el.dataset.i+'-'+el.dataset.j+'-h');if(h)h.textContent='XLR panel '+((pn.label||'').trim()||letter(gidx(+el.dataset.i,+el.dataset.j)))}}
  else if(a==='gear'){const it=S[el.dataset.g][+el.dataset.i],p=el.dataset.p;if(p==='insCh'||p==='insGrp'||p==='insOut'){it[p]=el.checked}else if(p==='cont'){it.cont=el.checked;convNotes()}else if(p==='mixer'){it.mixer=el.checked;if(it.mixer&&it.sends==null){it.sends=4;it.groups=4;it.outs=2}rer=true}else if(p==='row'){it.row=el.value}else if(p==='name'||p==='label'){it[p]=el.value;if(el.dataset.g==='conv')convNotes();if(p==='name'&&el.dataset.g!=='conv'){const l=document.getElementById(el.dataset.g+'-'+el.dataset.i+'-label');if(l)l.placeholder=autoLabel(it.name)}}else{it[p]=clamp(el.value,p==='ch'?1:0,128);const g=el.dataset.g,t=document.getElementById('total-'+g);if(t)t.innerHTML=totalHTML(g);}}
  else if(a==='mm'){const p=el.dataset.p;if(p==='on'){S.mm.on=el.checked;rer=true}else if(p==='inSt'||p==='outSt')S.mm[p]=el.checked;else if(p==='src')S.mm.src=el.value;else S.mm[p]=clamp(el.value,0,48)}
  else if(a==='set'){const p=el.dataset.p;if(p==='console'||p==='fmt'){S[p]=el.value;rer=true;if(p==='fmt'){S.moves={};histClear()}}else if(p==='monBay'||p==='monOff')S[p]=el.checked;else S[p]=clamp(el.value,0,128)}
