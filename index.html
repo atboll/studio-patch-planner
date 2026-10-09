@@ -126,6 +126,8 @@ input[type=number]{width:74px;font-family:var(--mono);font-variant-numeric:tabul
 .lblx .cap{flex:1 1 100%;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
 .lblx .f{width:140px}
 .lblx input{min-width:0;width:100%}
+.optbar{flex:1 1 100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 10px;border:1px solid var(--warn);background:var(--warn-bg);border-radius:4px;font-size:13.5px}
+.optbar span{flex:1 1 240px}
 .use{color:var(--muted);font-size:13.5px}
 .cq{font-weight:600;margin:0 0 6px}
 .rtb .cap{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
@@ -288,6 +290,7 @@ const monPairs=()=>{const a=[];let g=0,d0=0;S.conv.forEach((u,ui)=>{if(ui===0||!
 const monStartOf=()=>{const L=monPairs();if(!L.length)return 0;const v=+S.monStart||0;if(L.some(x=>x.start===v))return v;return L.reduce((b,x)=>Math.abs(x.start-v)<Math.abs(b.start-v)?x:b).start};
 const spareKind=name=>/^Mic lines/.test(name)?'mic':/outboard/i.test(name)?'ob':/^Preamp out|converter in$|^Converter out/.test(name)?'pre':/returns/i.test(name)?'ret':'';
 const spareW=(name,len)=>{const m=S.spareMode||'r8',f=S.spareFor||{},k=spareKind(name);if(m==='tight')return len;const add=(m==='p8'||m==='p16')&&f[k]?(m==='p8'?8:16):0;return Math.max(8,Math.ceil((len+add)/8)*8)};
+let OPT_PREVIEW=null;
 const feedOf=pn=>{const f=pn.feed||(pn.direct?'da':'');if(f==='da')return 'da';if(f==='patch')return 'patch';return S.mm&&S.mm.on?'cue':'patch'};
 function build(){
  const P=(l,dev,conn,io,bal=true)=>({l,dev,conn,io,bal});
@@ -360,13 +363,24 @@ function build(){
  PX.forEach(x=>{const n=+x.pn.tie||0;if(!n)return;TIES.push({from:x.r.name,panel:x.lb,lb:x.lb+' TIE',n,to:'Patchbay',bay:true});tieTop.push(...K('tie:'+x.g,x.r.name+' '+x.lb+' tie lines',G(range(n).map(i=>P(x.lb+' TIE '+(i+1),x.dev,'Line','out')),x.r.name+' '+x.lb+' tie',x.lb+' TIE',i=>i+1),1))});
  B('Tie lines',8,'NN',tieTop,[]);
 
- const cols=[];
- blocks.forEach((b,bi)=>{const len=Math.max(b.top.length,b.bottom.length);if(!len)return;
+ const cols=[],CONV=/converter in$|^Converter out/,free0=()=>({b:-1,t:null,m:null,n:'NN'});
+ blocks.forEach(b=>{const len=Math.max(b.top.length,b.bottom.length);if(!len){b.skip=1;return}
   b.w=b.fw||spareW(b.name,len);
-  if(b.end){b.w=Math.ceil(len/8)*8;b.top=[...Array(b.w-len).fill(null),...b.top];if(b.bottom.length)b.bottom=[...Array(b.w-len).fill(null),...b.bottom];const pad=(BW()-(cols.length+b.w)%BW())%BW();for(let k=0;k<pad;k++)cols.push({b:-1,t:null,m:null,n:'NN'})}
-  if(/converter in$|^Converter out/.test(b.name)){const rem=BW()-cols.length%BW();if(rem<BW())for(let k=0;k<rem;k++)cols.push({b:-1,t:null,m:null,n:'NN'})}
-  b.start=cols.length;
-  for(let i=0;i<b.w;i++){const t=b.top[i]||null,m=b.bottom[i]||null;const nk=b.name+':'+Math.floor(i/8);[t,m].forEach(x=>{if(x){x.c=b.color;x.sec=b.name}});cols.push({b:bi,t,m,nk,sug:b.normal,n:'NN'})}});
+  if(b.end){b.w=Math.ceil(len/8)*8;b.top=[...Array(b.w-len).fill(null),...b.top];if(b.bottom.length)b.bottom=[...Array(b.w-len).fill(null),...b.bottom]}});
+ const put=(b,bi,st)=>{b.start=st;for(let i=0;i<b.w;i++){const t=b.top[i]||null,m=b.bottom[i]||null;const nk=b.name+':'+Math.floor(i/8);[t,m].forEach(x=>{if(x){x.c=b.color;x.sec=b.name}});while(cols.length<=st+i)cols.push(free0());cols[st+i]={b:bi,t,m,nk,sug:b.normal,n:'NN'}}};
+ if(!(OPT_PREVIEW!=null?OPT_PREVIEW:S.opt)){
+  blocks.forEach((b,bi)=>{if(b.skip)return;
+   if(b.end){const pad=(BW()-(cols.length+b.w)%BW())%BW();for(let k=0;k<pad;k++)cols.push(free0())}
+   if(CONV.test(b.name)){const rem=BW()-cols.length%BW();if(rem<BW())for(let k=0;k<rem;k++)cols.push(free0())}
+   put(b,bi,cols.length)});
+ }else{
+  const W=BW(),bays=[],add=()=>{bays.push({p:0,e:0});return bays.length-1};
+  blocks.forEach((b,bi)=>{if(b.skip)return;let k;
+   if(b.w>W||CONV.test(b.name)){k=bays.length;const nb=Math.ceil(b.w/W);for(let j=0;j<nb;j++){add();bays[k+j].p=j<nb-1?W:b.w-(nb-1)*W}put(b,bi,k*W);return}
+   if(b.end){k=bays.findIndex(y=>W-y.e-y.p>=b.w);if(k<0)k=add();bays[k].e+=b.w;put(b,bi,k*W+W-bays[k].e);return}
+   k=bays.findIndex(y=>y.p+b.w<=W-y.e);if(k<0)k=add();put(b,bi,k*W+bays[k].p);bays[k].p+=b.w});
+  while(cols.length<bays.length*W)cols.push(free0());
+ }
  const freeCol=()=>({b:-1,t:null,m:null,n:'NN'}),moved=new Set(),stale=[];
  cols.forEach((c,g)=>{if(c.t)c.t.ag=g;if(c.m)c.m.ag=g});
  const mk=Object.keys(S.moves),held=[],grow=n=>{while(cols.length<n||cols.length%BW())cols.push(freeCol())};
@@ -389,6 +403,7 @@ function build(){
  if(S.bays&&need>S.bays)C('warn',`The plan needs ${need} bays but you have ${S.bays}. Bays marked "over" do not exist yet: choose less spare under House rules, cut lines, or add ${need-S.bays} more.`);
  else if(S.bays)C('ok',`Patchbays: ${need} of ${S.bays} used${S.bays>need?', '+(S.bays-need)+' completely free':''}.`);
  stale.forEach(n=>C('warn',`${n} could not stay where you dragged it, because those points are now taken. It is shown at its automatic position.`));
+ if(S.opt)C('info','Optimized: sections are packed to save bays, so they no longer follow signal order. Use Signal order to go back.');
  if(moved.size)C('info',`${moved.size} ${moved.size>1?'items are':'item is'} placed by hand. Reset layout puts everything back.`);
  const adU=cols.filter(c=>c.m&&/^ad:/.test(c.m.cl||'')&&c.n!=='NN').length,daU=cols.filter(c=>c.t&&/^da:/.test(c.t.cl||'')&&c.n!=='NN').length;
  if(preOut.length>ad.length)C('warn',`${preOut.length} preamp outputs but only ${ad.length} converter inputs.`);
@@ -493,11 +508,11 @@ const colTrack=i=>i+Math.floor(i/8)+1;
 const pos=(g,r)=>`B${Math.floor(g/BW())+1} ${r==='t'?'top':'bot'} ${g%BW()+1}`;
 function fitGroups(){document.querySelectorAll('#bays .grp').forEach(e=>{e.classList.remove('tight');e.textContent=e.dataset.full;delete e.dataset.tip;if(e.scrollWidth>e.clientWidth){e.textContent=e.dataset.short;e.dataset.tip=e.dataset.full;if(e.scrollWidth>e.clientWidth)e.classList.add('tight')}})}
 addEventListener('resize',()=>fitGroups());if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>fitGroups());
-let PLAN,justDragged=false,ANCH=null;const SEL=new Set();
-const UN=[],RE=[],snap=()=>JSON.stringify({m:S.moves,n:S.pn,l:S.lab});
+let PLAN,justDragged=false,ANCH=null,OPTP=null;const SEL=new Set();
+const UN=[],RE=[],snap=()=>JSON.stringify({m:S.moves,n:S.pn,l:S.lab,o:!!S.opt});
 function mark(){UN.push(snap());if(UN.length>200)UN.shift();RE.length=0}
 function histClear(){UN.length=0;RE.length=0}
-function hist(from,to){if(!from.length)return false;to.push(snap());const o=JSON.parse(from.pop());S.moves=o.m||{};S.pn=o.n||{};S.lab=o.l||{};return true}
+function hist(from,to){if(!from.length)return false;to.push(snap());const o=JSON.parse(from.pop());S.moves=o.m||{};S.pn=o.n||{};S.lab=o.l||{};S.opt=!!o.o;return true}
 function renderPanels(p){
  const box=document.getElementById('panels'),by={};p.cols.forEach(c=>['t','m'].forEach(r=>{const x=c[r];if(x&&/^(mic|ret):/.test(x.cl||''))by[x.pid]=x}));
  const W=482.6,U=44.45,P=26,X0=(W-15*P)/2,R=10.6,f=n=>(+n).toFixed(2);let g=0,h='',pv=null;
@@ -530,7 +545,7 @@ function renderPlan(){
  <ul class="checks">${[...p.checks].sort((a,b)=>order[a.lvl]-order[b.lvl]).map(c=>`<li><span class="tag ${c.lvl}">${c.lvl==='warn'?'Check':c.lvl==='ok'?'OK':'Note'}</span><span>${esc(c.t)}</span></li>`).join('')}</ul>`;
 
  const tmpl=range(BW()/8).map(()=>'repeat(8,minmax(0,1fr))').join(' minmax(2px,.3fr) ');
- let h=(p.assigned?'':`<p class="nothing">Nothing is on the patchbay yet. Add mic lines, preamps, converters and outboard in the questions, and they appear here.</p>`)+`<div class="exp"><span class="hint">Drag to move a unit · Option-drag (Alt): one label · Shift-click: select several · Double-click: rename · Right-click: reset</span><button class="btn" type="button" data-c="undo"${UN.length?'':' disabled'}>Undo</button><button class="btn" type="button" data-c="redo"${RE.length?'':' disabled'}>Redo</button><button class="btn" type="button" data-c="resetlayout"${Object.keys(S.moves).length?'':' disabled'}>Reset layout</button><button class="btn" type="button" data-c="resetnorm"${Object.keys(S.pn).length?'':' disabled'}>Reset normalling</button><button class="btn" type="button" data-c="resetlab"${Object.keys(S.lab).length?'':' disabled'}>Reset labels</button></div><div class="legend">${p.blocks.filter(b=>b.w!=null).map(b=>`<span><i style="--c:var(--c${b.color})"></i>${esc(b.name)}</span>`).join('')}</div><div class="nkey"><div><span class="nchip"><span class="nm NN">7</span></span><b>No normal</b><span>Top and bottom are separate.</span></div><div><span class="nchip"><span class="nm HN">7</span></span><b>Half normal</b><span>Top feeds bottom. A plug in the bottom breaks it.</span></div><div><span class="nchip"><span class="nm FN">7</span></span><b>Full normal</b><span>Top feeds bottom. A plug in either breaks it.</span></div><p class="hint">Click a number between the jacks to change it, or drag across numbers to paint.</p></div>`;
+ let h=(p.assigned?'':`<p class="nothing">Nothing is on the patchbay yet. Add mic lines, preamps, converters and outboard in the questions, and they appear here.</p>`)+`<div class="exp"><span class="hint">Drag to move a unit · Option-drag (Alt): one label · Shift-click: select several · Double-click: rename · Right-click: reset</span><button class="btn" type="button" data-c="undo"${UN.length?'':' disabled'}>Undo</button><button class="btn" type="button" data-c="redo"${RE.length?'':' disabled'}>Redo</button><button class="btn" type="button" data-c="resetlayout"${Object.keys(S.moves).length?'':' disabled'}>Reset layout</button><button class="btn" type="button" data-c="resetnorm"${Object.keys(S.pn).length?'':' disabled'}>Reset normalling</button><button class="btn" type="button" data-c="resetlab"${Object.keys(S.lab).length?'':' disabled'}>Reset labels</button>${S.opt?'<button class="btn" type="button" data-c="optoff">Signal order</button>':'<button class="btn addx" type="button" data-c="optprev">Optimize space</button>'}${OPTP?`<div class="optbar"><span>${OPTP.msg}</span>${OPTP.ok?'<button class="btn primary" type="button" data-c="optapply">Apply</button>':''}<button class="btn" type="button" data-c="optcancel">${OPTP.ok?'Cancel':'Close'}</button></div>`:''}</div><div class="legend">${p.blocks.filter(b=>b.w!=null).map(b=>`<span><i style="--c:var(--c${b.color})"></i>${esc(b.name)}</span>`).join('')}</div><div class="nkey"><div><span class="nchip"><span class="nm NN">7</span></span><b>No normal</b><span>Top and bottom are separate.</span></div><div><span class="nchip"><span class="nm HN">7</span></span><b>Half normal</b><span>Top feeds bottom. A plug in the bottom breaks it.</span></div><div><span class="nchip"><span class="nm FN">7</span></span><b>Full normal</b><span>Top feeds bottom. A plug in either breaks it.</span></div><p class="hint">Click a number between the jacks to change it, or drag across numbers to paint.</p></div>`;
  for(let b=0;b<p.nb;b++){
   const bw=BW(),cs=p.cols.slice(b*bw,b*bw+bw);
   const grpRow=(r,row)=>{let o='',i=0;while(i<bw){const x=cs[i][r];if(!x){o+=`<div class="gfree" style="grid-row:${row};grid-column:${colTrack(i)}"></div>`;i++;continue}
@@ -597,9 +612,15 @@ document.addEventListener('click',e=>{
  else if(c==='resetlayout'){mark();S.moves={}}
  else if(c==='resetnorm'){mark();S.pn={}}
  else if(c==='resetlab'){mark();S.lab={}}
+ else if(c==='optprev'){const a=PLAN;OPT_PREVIEW=true;let b2;try{b2=build()}finally{OPT_PREVIEW=null}const st=b2.checks.filter(x=>/could not stay/.test(x.t)).length;
+  OPTP=st?{ok:false,msg:`Optimizing would push ${st} hand-placed ${st>1?'items':'item'} out of place. Use Reset layout first, or keep the layout as it is.`}:b2.nb<a.nb?{ok:true,msg:`Optimize: ${a.nb} bays \u2192 ${b2.nb} bays. Units stay whole and normals are kept.`}:{ok:false,msg:'Already as compact as it gets: optimizing would not save a bay.'}}
+ else if(c==='optapply'){OPTP=null;mark();S.opt=true}
+ else if(c==='optcancel'){OPTP=null}
+ else if(c==='optoff'){mark();S.opt=false}
  else if(c==='undo')hist(UN,RE);
  else if(c==='redo')hist(RE,UN);
  if(['addgear','rmgear','addpanel','rmpanel','roomcount','rmtie'].includes(c))histClear();
+ if(!/^opt/.test(c))OPTP=null;
  renderForm();renderPlan();
  if(refocus){const f=document.querySelector(refocus);if(f&&!f.disabled)f.focus()}
 });
