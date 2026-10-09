@@ -618,18 +618,23 @@ document.addEventListener('click',e=>{
 (function(){const bays=document.getElementById('bays');let E=null;
  const close=save=>{if(!E)return;const e=E;E=null;const v=e.inp.value.replace(/\s+/g,' ').trim();e.inp.remove();if(!save)return;const cur=S.lab[e.k];
   if(v===''||v===e.auto){if(cur==null)return;mark();delete S.lab[e.k]}else{if(cur===v)return;mark();S.lab[e.k]=v}renderPlan()};
- const open=(cx,cy)=>{const hit=document.elementFromPoint(cx,cy);if(!hit||!hit.closest)return;const gp=hit.closest('#bays .grp[data-k]'),st=!gp&&hit.closest('#bays .strip[data-pid]'),el=gp||st;if(!el)return;close(true);
+ let quiet=0;
+ const nextEl=(f,dir)=>{if(f.gp){const L=[...bays.querySelectorAll('.grp[data-k][data-r="'+f.r+'"]')].sort((a,b)=>a.dataset.g-b.dataset.g),i=L.findIndex(x=>+x.dataset.g===f.g);return i<0?null:L[i+dir]||null}
+  const C=PLAN.cols;let g=C.findIndex(c=>c[f.r]&&c[f.r].pid===f.pid);if(g<0)return null;for(g+=dir;g>=0&&g<C.length;g+=dir)if(C[g][f.r])return bays.querySelector('.pt[data-g="'+g+'"] .strip.'+f.r);return null};
+ const open=(cx,cy)=>{const hit=document.elementFromPoint(cx,cy);if(!hit||!hit.closest)return;const gp=hit.closest('#bays .grp[data-k]'),st=!gp&&hit.closest('#bays .strip[data-pid]'),el=gp||st;if(!el)return;openEl(el)};
+ const openEl=el=>{const gp=el.classList.contains('grp');close(true);
   const r=el.getBoundingClientRect(),inp=document.createElement('input');inp.id='led';inp.type='text';inp.autocomplete='off';inp.spellcheck=false;inp.maxLength=gp?24:6;inp.setAttribute('aria-label',gp?'Group name':'Point label');
   const cur=gp?el.dataset.full:(el.textContent==='\u00b7'?'':el.textContent);inp.value=cur;inp.placeholder=el.dataset.auto||'';
   const w=Math.max(r.width,gp?110:64),x=Math.max(4,Math.min(innerWidth-w-4,r.left+r.width/2-w/2));inp.style.cssText='left:'+x+'px;top:'+(r.top+r.height/2-13)+'px;width:'+w+'px';
-  document.body.appendChild(inp);E={inp,k:gp?el.dataset.k:el.dataset.pid,auto:el.dataset.auto||''};inp.focus();inp.select();
-  inp.addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();close(true)}else if(ev.key==='Escape'){ev.preventDefault();close(false)}});
+  document.body.appendChild(inp);E={inp,k:gp?el.dataset.k:el.dataset.pid,auto:el.dataset.auto||'',f:{gp,r:gp?el.dataset.r:(el.classList.contains('t')?'t':'m'),g:+el.dataset.g,pid:el.dataset.pid}};inp.focus();inp.select();
+  inp.addEventListener('keydown',ev=>{ev.stopPropagation();if(ev.key==='Enter'){ev.preventDefault();close(true)}else if(ev.key==='Escape'){ev.preventDefault();close(false)}
+   else if(ev.key==='Tab'){ev.preventDefault();const f=E.f,dir=ev.shiftKey?-1:1;close(true);const n=nextEl(f,dir);if(!n)return;quiet=Date.now()+400;const b=n.getBoundingClientRect();if(b.top<0||b.bottom>innerHeight)n.scrollIntoView({block:'center'});setTimeout(()=>{const m=nextEl(f,dir);if(m)openEl(m)},b.top<0||b.bottom>innerHeight?120:0)}});
   inp.addEventListener('blur',()=>close(true))};
  let L=null;
  bays.addEventListener('pointerdown',e=>{if(e.button>0||e.shiftKey||e.metaKey||e.ctrlKey||!e.target.closest('.grp[data-k],.strip[data-pid]')){L=null;return}
   const t=Date.now();if(L&&t-L.t<450&&Math.abs(e.clientX-L.x)<6&&Math.abs(e.clientY-L.y)<6){const x=e.clientX,y=e.clientY;L=null;
    const go=()=>{removeEventListener('pointerup',go);setTimeout(()=>open(x,y),40)};addEventListener('pointerup',go)}else L={t,x:e.clientX,y:e.clientY}},true);
- addEventListener('scroll',e=>{if(E&&e.target!==E.inp)close(true)},true);addEventListener('resize',()=>close(true));
+ addEventListener('scroll',e=>{if(E&&e.target!==E.inp&&Date.now()>quiet)close(true)},true);addEventListener('resize',()=>close(true));
 })();
 /* ---------- normalling: click or paint the number between the jacks ---------- */
 (function(){const bays=document.getElementById('bays');let PT=null,NA=null;
