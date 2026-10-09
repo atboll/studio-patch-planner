@@ -267,7 +267,7 @@ const S={step:0,sel:0,norm:{},pn:{},lab:{},retv:2,
  pre:[],
  ob:[],
  tie:[],
- conv:[{name:'Converter 1',label:'',ad:0,da:0}],console:'none',conCh:24,spk:2,cue:2,loom:'dsub',spare:10,bays:0,monBay:true,monOff:false,monPair:0,monStart:0,convSum:false,moves:{},fmt:'bantam',name:'',mm:{on:false,ins:4,inSt:false,outs:2,outSt:true,src:'da'}};
+ conv:[{name:'Converter 1',label:'',ad:0,da:0}],console:'none',conCh:24,spk:2,cue:2,loom:'dsub',spare:10,spareMode:'p8',spareFor:{mic:true,ob:true,ret:true,pre:false},bays:0,monBay:true,monOff:false,monPair:0,monStart:0,convSum:false,moves:{},fmt:'bantam',name:'',mm:{on:false,ins:4,inSt:false,outs:2,outSt:true,src:'da'}};
 
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const range=n=>Array.from({length:Math.max(0,n)},(_,i)=>i);
@@ -286,6 +286,8 @@ const devName=it=>(it.name||'').trim()||lab(it);
 
 const monPairs=()=>{const a=[];let g=0,d0=0;S.conv.forEach((u,ui)=>{if(ui===0||!u.cont)d0=0;const n=+u.da||0;for(let k=0;k+1<n;k+=2)a.push({start:g+k,ui,a:d0+k+1,b:d0+k+2});g+=n;d0+=n});return a};
 const monStartOf=()=>{const L=monPairs();if(!L.length)return 0;const v=+S.monStart||0;if(L.some(x=>x.start===v))return v;return L.reduce((b,x)=>Math.abs(x.start-v)<Math.abs(b.start-v)?x:b).start};
+const spareKind=name=>/^Mic lines/.test(name)?'mic':/outboard/i.test(name)?'ob':/^Preamp out|converter in$|^Converter out/.test(name)?'pre':/returns/i.test(name)?'ret':'';
+const spareW=(name,len)=>{const m=S.spareMode||'r8',f=S.spareFor||{},k=spareKind(name);if(m==='tight')return len;const add=(m==='p8'||m==='p16')&&f[k]?(m==='p8'?8:16):0;return Math.max(8,Math.ceil((len+add)/8)*8)};
 const feedOf=pn=>{const f=pn.feed||(pn.direct?'da':'');if(f==='da')return 'da';if(f==='patch')return 'patch';return S.mm&&S.mm.on?'cue':'patch'};
 function build(){
  const P=(l,dev,conn,io,bal=true)=>({l,dev,conn,io,bal});
@@ -340,7 +342,7 @@ function build(){
   B('Aux send / console return',5,'NN',range(6).map(i=>P('AUX '+(i+1),'Console','D-sub','out')),range(8).map(i=>P('RET '+(i+1),'Console','D-sub','in')));
   adNeed=n;
  }else{
-  const fw=Math.ceil(Math.max(8,Math.ceil(Math.max(preOut.length,ad.length)*(1+S.spare/100)/8)*8)/BW())*BW();
+  const fw=Math.ceil(spareW('Preamp out / converter in',Math.max(preOut.length,ad.length,1))/BW())*BW();
   if(mixEnd.length&&preOut.length+mixEnd.length<=fw){mixEnd.forEach(x=>x.nn=true);blocks.push({name:'Preamp out, mixer aux, groups and outputs / converter in',color:2,normal:'HN',top:[...preOut,...Array(fw-preOut.length-mixEnd.length).fill(null),...mixEnd],bottom:underSends([...preOut,...Array(fw-preOut.length-mixEnd.length).fill(null),...mixEnd],[...ad,...Array(Math.max(0,fw-ad.length)).fill(null)]),fw})}
   else{B('Preamp out / converter in',2,'HN',preOut,ad);ME()}
   adNeed=preOut.length;
@@ -360,7 +362,7 @@ function build(){
 
  const cols=[];
  blocks.forEach((b,bi)=>{const len=Math.max(b.top.length,b.bottom.length);if(!len)return;
-  b.w=b.fw||Math.max(8,Math.ceil(len*(1+S.spare/100)/8)*8);
+  b.w=b.fw||spareW(b.name,len);
   if(b.end){b.w=Math.ceil(len/8)*8;b.top=[...Array(b.w-len).fill(null),...b.top];if(b.bottom.length)b.bottom=[...Array(b.w-len).fill(null),...b.bottom];const pad=(BW()-(cols.length+b.w)%BW())%BW();for(let k=0;k<pad;k++)cols.push({b:-1,t:null,m:null,n:'NN'})}
   if(/converter in$|^Converter out/.test(b.name)){const rem=BW()-cols.length%BW();if(rem<BW())for(let k=0;k<rem;k++)cols.push({b:-1,t:null,m:null,n:'NN'})}
   b.start=cols.length;
@@ -377,14 +379,14 @@ function build(){
  held.forEach(h=>{const T=S.moves[h.k];grow(T+1);if(!cols[T][h.r]){cols[T][h.r]=h.x;moved.add(h.k);return}
   stale.push(h.x.l);let g=cols[h.g][h.r]?cols.findIndex(c=>!c[h.r]):h.g;if(g<0){g=cols.length;grow(g+1)}cols[g][h.r]=h.x});
  const assigned=cols.reduce((a,c)=>a+(c.t?1:0)+(c.m?1:0),0);
- const need=Math.max(1,Math.ceil(cols.length/BW())),nb=Math.max(need,S.bays||0);
+ const need=Math.max(1,Math.ceil(cols.length/BW()))+(S.spareMode==='bay'?1:0),nb=Math.max(need,S.bays||0);
  while(cols.length<nb*BW())cols.push(freeCol());
  cols.forEach((c,g)=>{if(!c.nk){c.nk='free:'+Math.floor(g/8);c.sug='NN'}const t=c.t,m=c.m,k=t&&m?t.pid+'|'+m.pid:null;c.nsug=k?((t.yn||m.yn)?'HN':(t.nn||m.nn)?'NN':c.sug):'NN';c.nset=!!(k&&S.pn[k]&&S.pn[k]!==c.nsug);c.n=k?(S.pn[k]||c.nsug):'NN'});
 
 
 
  const checks=[];const C=(lvl,t)=>checks.push({lvl,t});
- if(S.bays&&need>S.bays)C('warn',`The plan needs ${need} bays but you have ${S.bays}. Bays marked "over" do not exist yet: lower the spare capacity, cut lines, or add ${need-S.bays} more.`);
+ if(S.bays&&need>S.bays)C('warn',`The plan needs ${need} bays but you have ${S.bays}. Bays marked "over" do not exist yet: choose less spare under House rules, cut lines, or add ${need-S.bays} more.`);
  else if(S.bays)C('ok',`Patchbays: ${need} of ${S.bays} used${S.bays>need?', '+(S.bays-need)+' completely free':''}.`);
  stale.forEach(n=>C('warn',`${n} could not stay where you dragged it, because those points are now taken. It is shown at its automatic position.`));
  if(moved.size)C('info',`${moved.size} ${moved.size>1?'items are':'item is'} placed by hand. Reset layout puts everything back.`);
@@ -476,7 +478,9 @@ function stepHTML(){
  <label class="f grow"><span>Input comes from</span><select id="mm-src" data-a="mm" data-p="src"><option value="da"${S.mm.src==='da'?' selected':''}>Converter outputs</option><option value="sends"${S.mm.src==='sends'?' selected':''}>Aux sends from mixer</option></select></label>`:''}</div>`+retBlock();
  return `<p class="q">What are the house rules?</p><p class="hint">Choose the bay format and how much room to leave.</p>
  <div class="row"><label class="f grow"><span>Patchbay format</span><select id="set-fmt" data-a="set" data-p="fmt"><option value="bantam"${S.fmt==='bantam'?' selected':''}>Bantam (TT) · 2 × 48 points</option><option value="jack"${S.fmt==='jack'?' selected':''}>Jack · 2 × 24 points</option></select></label></div>
- <div class="row"> <label class="f grow"><span>Spare capacity</span><select id="set-spare" data-a="set" data-p="spare">${[0,10,20,30,50].map(v=>`<option value="${v}"${v===S.spare?' selected':''}>${v} %</option>`).join('')}</select></label></div>
+ <div class="row spr"><label class="f grow"><span>Spare points</span><select id="set-spareMode" data-a="set" data-p="spareMode">${[['tight','Tight: no spare, pack sections'],['r8','Round each section up to 8'],['p8','At least 8 free per section'],['p16','At least 16 free per section'],['bay','One empty bay at the end']].map(([v,t])=>`<option value="${v}"${v===(S.spareMode||'r8')?' selected':''}>${t}</option>`).join('')}</select></label>
+ ${S.spareMode==='p8'||S.spareMode==='p16'?`<div class="line insx"><span class="cap">Leave spare on</span>${[['mic','Mic lines'],['ob','Outboard'],['ret','Room returns'],['pre','Preamps and converters']].map(([k,t])=>`<label class="chk"><input type="checkbox" id="spare-${k}"${(S.spareFor||{})[k]?' checked':''} data-a="sparefor" data-p="${k}"><span>${t}</span></label>`).join('')}</div>`:''}
+ <p class="use" id="spare-res"></p></div>
  <div class="row"><label class="f grow"><span>Patchbays you have</span><select id="set-bays" data-a="set" data-p="bays"><option value="0"${!S.bays?' selected':''}>Auto, as many as the plan needs</option>${range(12).map(i=>`<option value="${i+1}"${S.bays===i+1?' selected':''}>${i+1} × ${FMT()} (${(i+1)*BW()*2} points)</option>`).join('')}</select></label></div>`;
 }
 function renderForm(){
@@ -546,6 +550,7 @@ function renderPlan(){
  document.getElementById('bays').innerHTML=h;
  renderPanels(p);
  if(window.lblSync)window.lblSync();
+ {const sr=document.getElementById('spare-res');if(sr){const sp=p.blocks.filter(b=>b.w!=null&&!b.end).reduce((a,b)=>a+Math.max(0,b.w-Math.max(b.top.filter(Boolean).length,b.bottom.filter(Boolean).length)),0);sr.textContent=sp+' spare '+(sp===1?'point':'points')+' inside the sections \u00b7 '+p.nb+' '+(p.nb>1?'bays':'bay')+' in total.'}}
  fitGroups();
  persist();
 
@@ -561,8 +566,9 @@ function onField(e){
  else if(a==='panel'){const pn=S.rooms[+el.dataset.i].panels[+el.dataset.j],p=el.dataset.p;pn[p]=(p==='direct'||p==='stereo'||p==='cont')?el.checked:(p==='lines'||p==='cue')?clamp(el.value,0,p==='cue'?48:96):el.value;if(p==='feed')delete pn.direct;
  if(p==='label'){const h=document.getElementById('pn-'+el.dataset.i+'-'+el.dataset.j+'-h');if(h)h.textContent='XLR panel '+((pn.label||'').trim()||letter(gidx(+el.dataset.i,+el.dataset.j)))}}
  else if(a==='gear'){const it=S[el.dataset.g][+el.dataset.i],p=el.dataset.p;if(p==='insCh'||p==='insGrp'||p==='insOut'||p==='line'){it[p]=el.checked}else if(p==='cont'){it.cont=el.checked;convNotes()}else if(p==='mixer'){it.mixer=el.checked;if(it.mixer&&it.sends==null){it.sends=4;it.groups=4;it.outs=2}rer=true}else if(p==='row'){it.row=el.value}else if(p==='name'||p==='label'){it[p]=el.value;if(el.dataset.g==='conv')convNotes();if(p==='name'&&el.dataset.g!=='conv'){const l=document.getElementById(el.dataset.g+'-'+el.dataset.i+'-label');if(l)l.placeholder=autoLabel(it.name)}}else{it[p]=clamp(el.value,p==='ch'?1:0,128);const g=el.dataset.g,t=document.getElementById('total-'+g);if(t)t.innerHTML=totalHTML(g);}}
+ else if(a==='sparefor'){if(!S.spareFor)S.spareFor={};S.spareFor[el.dataset.p]=el.checked}
  else if(a==='mm'){const p=el.dataset.p;if(p==='on'){S.mm.on=el.checked;rer=true}else if(p==='inSt'||p==='outSt')S.mm[p]=el.checked;else if(p==='src')S.mm.src=el.value;else S.mm[p]=clamp(el.value,0,48)}
- else if(a==='set'){const p=el.dataset.p;if(p==='console'||p==='fmt'){S[p]=el.value;rer=true;if(p==='fmt'){S.moves={};histClear()}}else if(p==='monBay'||p==='monOff')S[p]=el.checked;else if(p==='monStart')S.monStart=+el.value||0;else S[p]=clamp(el.value,0,128)}
+ else if(a==='set'){const p=el.dataset.p;if(p==='console'||p==='fmt'){S[p]=el.value;rer=true;if(p==='fmt'){S.moves={};histClear()}}else if(p==='monBay'||p==='monOff')S[p]=el.checked;else if(p==='monStart')S.monStart=+el.value||0;else if(p==='spareMode'){S.spareMode=el.value;rer=true}else S[p]=clamp(el.value,0,128)}
  if(rer)renderForm();renderPlan();
 }
 document.getElementById('bays').addEventListener('change',e=>{const el=e.target;if(!el.classList.contains('nsel'))return;mark();S.norm[el.dataset.k]=el.value;const id=el.id;renderPlan();const n=document.getElementById(id);if(n)n.focus()});
@@ -672,6 +678,7 @@ function applyState(o){
  {let g=0;n.rooms.forEach(r=>r.panels.forEach(pn=>{const lb=(pn.label||'').trim()||letter(g);g++;if(pn.tie>0){n.ob.push({name:'Tie lines '+lb,label:lb+' TIE',i:0,o:pn.tie});['moves','lab'].forEach(m=>Object.keys(n[m]||{}).forEach(k=>{if(/^tie:/.test(k))delete n[m][k]}))}pn.tie=0}))}
  if(oldRet)n.rooms.forEach(r=>r.panels.forEach(pn=>{if(pn.stereo)pn.cue=(+pn.cue||0)*2}));n.retv=2;
  if(o.monStart==null&&o.monPair)n.monStart=(+o.monPair||0)*2;
+ if(o.spareMode==null)n.spareMode=(+o.spare>0)?'p8':'r8';if(!n.spareFor||typeof n.spareFor!=='object')n.spareFor={mic:true,ob:true,ret:true,pre:false};
  if(n.convSum){n.conv.forEach((u,k)=>{if(k>0)u.cont=true});n.convSum=false}
  if(!n.mm||typeof n.mm!=='object')n.mm={on:false,ins:4,inSt:false,outs:2,outSt:true,src:'da'};
  n.step=Math.min(STEPS.length-1,Math.max(0,parseInt(n.step,10)||0));n.sel=0;
